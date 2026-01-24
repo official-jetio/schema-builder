@@ -1,0 +1,63 @@
+{
+  "name": "@jetio/schema-builder",
+  "version": "1.0.1",
+  "description": "Fluent, type-safe JSON Schema builder for TypeScript. Works with @jetio/validator.",
+  "main": "dist/index.cjs.js",
+  "module": "dist/index.esm.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.esm.js",
+      "require": "./dist/index.cjs.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "npm run clean && tsc && npm run bundle",
+    "bundle": "rollup -c",
+    "clean": "rm -rf dist/",
+    "lint": "eslint src --ext .ts",
+    "prepublishOnly": "npm run clean && npm run build"
+  },
+  "keywords": [
+    "json-schema",
+    "schema-builder",
+    "typescript",
+    "fluent-api",
+    "validation",
+    "jetio",
+    "type-safe"
+  ],
+  "author": "Great Venerable",
+  "license": "MIT",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "sideEffects": false,
+  "dependencies": {
+    "@jetio/validator": "^1.0.0"
+  },
+  "devDependencies": {
+    "@rollup/plugin-terser": "^0.4.4",
+    "@types/node": "^18.19.127",
+    "rollup": "^2.79.2",
+    "rollup-plugin-filesize": "^10.0.0",
+    "rollup-plugin-typescript2": "^0.36.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/official-jetio/schema-builder.git"
+  },
+  "bugs": {
+    "url": "https://github.com/official-jetio/schema-builder/issues"
+  },
+  "homepage": "https://github.com/official-jetio/schema-builder#readme"
+}
