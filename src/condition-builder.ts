@@ -1,4 +1,3 @@
-import { SchemaDefinition } from "@jetio/validator";;
 import { SchemaBuilder } from "./schema-builder";
 import { BaseBuilderSchema, BuilderSchema } from "./types/base-schema";
 

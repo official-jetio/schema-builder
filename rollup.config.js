@@ -24,7 +24,7 @@ export default [
       }),
     ],
     // IMPORTANT: Don't bundle the validator - it's a dependency
-    external: ["@jetio/validator"],
+    external: ["@jetio/validator", "fs/promises"],
   },
 
   // ===========================================
