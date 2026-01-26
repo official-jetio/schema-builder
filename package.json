@@ -1,6 +1,6 @@
 {
   "name": "@jetio/schema-builder",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Fluent, type-safe JSON Schema builder for TypeScript. Works with @jetio/validator.",
   "main": "dist/index.cjs.js",
   "module": "dist/index.esm.js",
