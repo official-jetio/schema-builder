@@ -13,7 +13,7 @@
     "sourceMap": true /* Skip type checking all .d.ts files. */
   },
   "include": [
-    "src/**/*.ts",
+    "src/**/*.ts", "test/stayhere.ts",
   ],
-  "exclude": ["tests/**/*.ts", "node_modules"]
+  "exclude": ["test/**/*.ts", "node_modules", "test/stayhere.ts"]
 }

@@ -1,8 +1,10 @@
 # 📐 Schema Builder Guide
 
-The Schema Builder provides a fluent, type-safe API for constructing JSON Schemas programmatically. Build complex schemas with autocomplete, validation, and zero boilerplate.
+The Schema Builder provides a fluent, type-safe API for constructing JSON Schemas programmatically. Build complex schemas with autocomplete, validation, and zero boilerplate and get automatic type inference.
 
 > **Note:** This package includes [@jetio/validator](https://github.com/official-jetio/validator) as a dependency. You get both the builder AND the fastest JSON Schema validator in one install.
+
+> **Important:** Jetio/schema-builder is a **JSON Schema spec-compliant** tool built on top of [@jetio/validator](https://github.com/official-jetio/validator). To utilize it to its fullest potential, it's essential to understand the main validator package. All core documentation about validation rules, error handling, $data references, and advanced features can be found in the [Validator Documentation](https://github.com/official-jetio/validator/blob/main/DOCUMENTATION.md).
 
 ---
 
@@ -22,6 +24,116 @@ import { JetValidator } from "@jetio/schema-builder"; // Re-exported from @jetio
 ```
 
 > **Just need the validator?** Install [@jetio/validator](https://www.npmjs.com/package/@jetio/validator) directly for a smaller bundle.
+
+---
+
+## Type Inference
+
+JetIO Schema Builder includes **Json Schema spec compliant automatic TypeScript type inference** through `Jet.Infer<>`. Write your schema once and get both runtime validation AND compile-time types!
+
+```typescript
+import { SchemaBuilder, Jet } from "@jetio/schema-builder";
+
+const userSchema = new SchemaBuilder()
+  .object()
+  .properties({
+    id: (s) => s.number(),
+    name: (s) => s.string(),
+    email: (s) => s.string().format('email')
+  })
+  .required(['id', 'name', 'email'])
+  .build();
+
+// Automatically infer TypeScript type from schema
+type User = Jet.Infer<typeof userSchema>;
+/*
+{
+  id: number;
+  name: string;
+  email: string;
+}
+*/
+
+// Type-safe usage
+const user: User = {
+  id: 1,
+  name: "Alice",
+  email: "alice@example.com"
+}; // ✅
+
+const invalidUser: User = {
+  id: 1,
+  name: "Bob"
+  // ❌ TypeScript Error: Property 'email' is missing
+};
+```
+
+### Why Type Inference Matters
+
+- **Single Source of Truth**: Schema and types never drift out of sync
+- **Automatic Updates**: Change the schema, types update automatically
+- **Runtime + Compile Time Safety**: Catch errors at both stages
+- **Zero Duplication**: No need to write interfaces separately
+
+### Advanced Type Inference
+
+Type inference works with all schema features:
+
+```typescript
+// Discriminated unions
+const shapeSchema = new SchemaBuilder()
+  .oneOf(
+    (s) => s.object()
+      .properties({
+        type: (s) => s.const('circle'),
+        radius: (s) => s.number()
+      })
+      .required(['type', 'radius']),
+    (s) => s.object()
+      .properties({
+        type: (s) => s.const('rectangle'),
+        width: (s) => s.number(),
+        height: (s) => s.number()
+      })
+      .required(['type', 'width', 'height'])
+  )
+  .build();
+
+type Shape = Jet.Infer;
+// { type: 'circle'; radius: number } | { type: 'rectangle'; width: number; height: number }
+
+// Conditionals with elseIf
+const accountSchema = new SchemaBuilder()
+  .object()
+  .properties({
+    accountType: (s) => s.string(),
+    username: (s) => s.string(),
+    companyName: (s) => s.string()
+  })
+  .required(['accountType'])
+  .if((s) => s.object().properties({ accountType: (s) => s.const('personal') }))
+  .then((s) => s.object().required(['username']))
+  .elseIf((s) => s.object().properties({ accountType: (s) => s.const('business') }))
+  .then((s) => s.object().required(['companyName']))
+  .end()
+  .build();
+
+type Account = Jet.Infer;
+// TypeScript understands the conditional branches!
+```
+
+**📖 For complete type inference documentation, see [Type Inference Guide](./TYPE_INFERENCE.md)**
+
+Topics covered in the Type Inference guide:
+- Primitives, objects, arrays, and their type inference
+- Pattern properties with template literal types
+- Multiple types and union inference
+- Discriminated unions with oneOf/anyOf
+- Conditional type inference (if/then/else/elseIf)
+- Complex compositions with allOf
+- Required vs optional property splitting
+- Type inference limitations and workarounds
+-addtionalItems/Properties, unevaluatedProperties/Items, patternProperties.
 
 ---
 
@@ -207,33 +319,39 @@ When chaining type methods, the **first type called** determines which keywords 
 // String-first: string keywords available
 new SchemaBuilder()
   .string() // Locks to StringSchemaBuilder
-  .number() // Adds "number" to type array, but still StringSchemaBuilder
-  .minLength(5) // ✅ String keyword - available
-  .pattern(/^a/) // ✅ String keyword - available
-  .minimum(0); // ❌ TypeScript error - number keyword not available
+  .number() // Adds "number" to type array and changes to NumberSchemaBuilder
+  .minLength(5) // ❌ TypeScript error - String keyword
+  .pattern(/^a/) // ❌ TypeScript error - String keyword
+  .minimum(0); // ✅ number keyword - available
 
 // Number-first: number keywords available
 new SchemaBuilder()
   .number() // Locks to NumberSchemaBuilder
-  .string() // Adds "string" to type array, but still NumberSchemaBuilder
-  .minimum(0) // ✅ Number keyword - available
-  .multipleOf(5) // ✅ Number keyword - available
-  .minLength(5); // ❌ TypeScript error - string keyword not available
+  .string() // Adds "string" to type array, changed to StringSchemaBuilder
+  .minimum(0) // ❌ TypeScript error - Number keyword
+  .multipleOf(5) // ❌ TypeScript error - Number keyword
+  .minLength(5); // ✅ string keyword - available
+
+// Correct Approach
+new SchemaBuilder()
+  .number()
+  .minimum(0)
+  .multipleOf(5)
+  .string()
+  .minLength(5);
 ```
 
 **Why this design?**
 
-This ensures strict typing, making sure only methods of the desired type are accessible. The first type called decides the available methods, but users can still accept other types if they want a multi-type schema with one primary type's constraints.
+This ensures strict typing, making sure only methods of the desired type are accessible. The last type called decides the available methods, but users can still accept other types if they want a multi-type schema with one primary type's constraints.
 
-If you need to define constraints for multiple types, use `.end()` to reset to the base `SchemaBuilder` and then call the next type:
+If you need to define constraints for multiple types, just call the new type after the constraints for existing type is fully defined :
 
 ```typescript
 const schema = new SchemaBuilder()
   .string()
-  .number()
   .minLength(5) // String constraint
-  .end() // Reset to base SchemaBuilder
-  .number() // Now NumberSchemaBuilder
+  .number() // Branches to  NumberSchemaBuilder
   .minimum(0) // Number constraint now available
   .build();
 
@@ -376,10 +494,10 @@ const tagsSchema = new SchemaBuilder()
 // Fixed-length arrays with different types per position
 const coordinateSchema = new SchemaBuilder()
   .array()
-  .prefixItems([
+  .prefixItems(
     s => s.number(), // latitude
     s => s.number()  // longitude
-  ])
+  )
   .minItems(2)
   .maxItems(2)
   .build();
@@ -437,10 +555,10 @@ Control validation of array items not covered by `prefixItems`, `items`, or `con
 // Disallow any unevaluated items
 const strictTuple = new SchemaBuilder()
   .array()
-  .prefixItems([
+  .prefixItems(
     s => s.string(),
     s => s.number()
-  ])
+  )
   .unevaluatedItems(false)
   .build();
 
@@ -459,10 +577,10 @@ const strictTuple = new SchemaBuilder()
 // Allow unevaluated items with schema
 const flexibleTuple = new SchemaBuilder()
   .array()
-  .prefixItems([
+  .prefixItems(
     s => s.string(),
     s => s.number()
-  ])
+  )
   .unevaluatedItems(s => s.boolean())
   .build();
 
@@ -472,10 +590,10 @@ const flexibleTuple = new SchemaBuilder()
 // Allow any unevaluated items
 const openTuple = new SchemaBuilder()
   .array()
-  .prefixItems([
+  .prefixItems(
     s => s.string(),
     s => s.number()
-  ])
+  )
   .unevaluatedItems(true)
   .build();
 
@@ -490,10 +608,10 @@ For older drafts, use `additionalItems` with array-form `items`:
 // Disallow additional items beyond the tuple
 const strictTupleLegacy = new SchemaBuilder()
   .array()
-  .items([
+  .items(
     { type: "string" },
     { type: "number" }
-  ])
+  )
   .additionalItems(false)
   .build();
 
@@ -512,10 +630,10 @@ const strictTupleLegacy = new SchemaBuilder()
 // Allow additional items with schema
 const flexibleTupleLegacy = new SchemaBuilder()
   .array()
-  .items([
+  .items(
     s => s.string(),
     s => s.number()
-  ])
+  )
   .additionalItems(s => s.boolean())
   .build();
 
@@ -525,10 +643,10 @@ const flexibleTupleLegacy = new SchemaBuilder()
 // Allow any additional items
 const openTupleLegacy = new SchemaBuilder()
   .array()
-  .items([
+  .items(
     s => s.string(),
     s => s.number()
-  ])
+  )
   .additionalItems(true)
   .build();
 
@@ -536,6 +654,8 @@ const openTupleLegacy = new SchemaBuilder()
 ```
 
 > **Note:** In Draft 2020-12, array-form `items` was replaced by `prefixItems`, and `additionalItems` was replaced by `items` (schema form) for items beyond the tuple. Use `unevaluatedItems` for items not validated by any keyword.
+
+> tuple `prefixItems` and `items` was changed from `.prefixItems([])` and `.items([])` to `.prefixItems(...[])` and `.items(...[])`
 
 ---
 
@@ -648,11 +768,6 @@ const openComposition = new SchemaBuilder()
 
 // Valid: { id: 1, anything: "goes" }
 ```
-
-> **When to use which:**
->
-> - `additionalProperties`: Simple objects without composition
-> - `unevaluatedProperties`: Complex schemas with `allOf`/`anyOf`/`oneOf`/`if-then-else` where properties are defined across multiple subschemas
 
 ### Property Name Constraints
 
@@ -865,7 +980,7 @@ Many keywords accept `true`, `false`, a schema object, or a builder callback. Bo
 )
 ```
 
-## **Basically in json schema, a boolean is a schema so any keyword that accepts a schema also accepts a boolean.**
+**Basically in json schema, a boolean is a schema so any keyword that accepts a schema also accepts a boolean.**
 
 ## Composition
 
@@ -1188,7 +1303,7 @@ const accountSchema = new SchemaBuilder()
         .else(...)
       )
   )
-// 😵 Nested hell!
+// Nested hell!
 ```
 
 ### Nested Conditionals
@@ -1233,37 +1348,11 @@ const advancedRulesSchema = new SchemaBuilder()
   .end()
   .build();
 ```
+> If you are not ending your conditional with `.else()` then always call the `.end()` method
 
-### Conditional with $data
-
-Use runtime data for conditional logic:
-
-```typescript
-const passwordConfirmSchema = new SchemaBuilder()
-  .object()
-  .properties({
-    password: (s) => s.string().minLength(8),
-    confirmPassword: (s) => s.string(),
-  })
-  .if((s) =>
-    s.object().properties({
-      password: (s) => s.string().minLength(1), // password exists
-    }),
-  )
-  .then((s) =>
-    s.object().properties({
-      confirmPassword: (s) => s.const({ $data: "1/password" }),
-    }),
-  )
-  .build();
-
-// confirmPassword must match password if password is provided
-```
-
-## **Check Jet-Validator documentation for keywords that support $data**
+**Check Jet-Validator documentation for keywords that support $data**
 
 ## References
-
 ### $ref - Schema References
 
 #### Local References
@@ -1403,7 +1492,7 @@ const complexSchema = new SchemaBuilder()
   .properties({
     // Reference nested property
     primaryContact: (s) =>
-      s.$ref((r) => r.$defs("person").properties("contacts").items(0)),
+      s.$ref((r) => r.$defs("person").properties("contacts").items()),
 
     // Reference with external base
     externalRef: (s) =>
@@ -1692,7 +1781,7 @@ const schema = new SchemaBuilder()
   .build();
 ```
 
-## **Read the jet-Validator docuemntation to properly understand how error messages work.**[Error Handling](https://github.com/official-jetio/validator/blob/main/DOCUMENTATION.md#error-handling)
+ **Read the jet-Validator docuemntation to properly understand how error messages works [Error Handling](https://github.com/official-jetio/validator/blob/main/DOCUMENTATION.md#error-handling).**
 
 ## Advanced Features
 
@@ -1786,8 +1875,8 @@ const baseUser = new SchemaBuilder()
   .required(["id", "name"]);
 
 // Extend base schema
-const adminUser = baseUser
-  .extend() // Clone the schema
+const adminUser = new SchemaBuilder()
+  .extend(baseUser) // Clone the schema
   .properties({
     role: (s) => s.string().const("admin"),
     permissions: (s) => s.array().items((s) => s.string()),
@@ -1798,6 +1887,81 @@ const adminUser = baseUser
 // baseUser is unchanged
 // adminUser has: id, name, email, role, permissions
 ```
+
+### Important Notes on Extension
+
+> **Always extend a schema before building on it.** You can replace most keywords by redefining them after extending.
+
+**Keywords that MERGE (cannot be replaced):**
+- `properties` - New properties are added to existing ones
+- `patternProperties` - New patterns are added to existing ones
+- `required` - New required fields are added to existing array
+- `$defs` / `definitions` - New definitions are added to existing ones
+- `dependentSchemas` - New dependent schemas are added to existing ones
+- `dependencies` - New dependencies are added to existing ones
+
+**Keywords that REPLACE (override existing):**
+- All other keywords (`type`, `oneOf`, `anyOf`, `allOf`, `enum`, `const`, `items`, etc.)
+
+**Modifying merged keywords:**
+
+To modify properties from merged keywords, use helper methods:
+```typescript
+// Remove properties and update required
+const schema = new SchemaBuilder()
+  .extend(baseSchema)
+  .remove(['fieldName'], ['properties', 'required'])
+  .build();
+
+// Make all fields optional
+const optionalSchema = new SchemaBuilder()
+  .extend(baseSchema)
+  .optional()
+  .build();
+
+// Override a specific property by redefining it
+const updatedSchema = new SchemaBuilder()
+  .extend(baseSchema)
+  .properties({
+    existingField: (s) => s.string() // Redefines the type for this field
+  })
+  .build();
+```
+
+**Example:**
+```typescript
+const base = new SchemaBuilder()
+  .object()
+  .properties({
+    id: (s) => s.number(),
+    name: (s) => s.string()
+  })
+  .required(['id', 'name'])
+  .build();
+
+// This ADDS to properties and required (doesn't replace)
+const extended = new SchemaBuilder()
+  .extend(base)
+  .properties({ email: (s) => s.string() })
+  .required(['email'])
+  .build();
+// Result: properties = { id, name, email }, required = ['id', 'name', 'email']
+
+// To remove a property:
+const withoutName = new SchemaBuilder()
+  .extend(base)
+  .remove(['name'], ['properties'])
+  .build();
+// Result: properties = { id }, required = ['id']
+
+// To make all optional:
+const allOptional = new SchemaBuilder()
+  .extend(base)
+  .optional()
+  .build();
+// Result: properties = { id, name }, required = []
+```
+**See available targets for remove in objects above.**
 
 ### Loading External Schemas
 
@@ -1846,7 +2010,7 @@ const extended = new SchemaBuilder()
 ```
 
 **Note:** When loading an external schema with either file, url or json, ensure its done at the beginning of the schema builder as it replaces the entire schema object of that schema builder.
-Ensure its done first before building on the schema.
+Ensure its done first before building on the schema. This rule also applies to extend.
 
 ### Composition with extend()
 
@@ -1972,10 +2136,8 @@ const schema = new SchemaBuilder()
 - Dynamic schema generation
 
 **Use JSON When:**
-
-- Simple, one-off schemas
 - Copying from existing JSON Schema
-- Performance-critical (minimal overhead)
+- Performance-critical
 - Interfacing with external systems
 
 **Mix When:**
@@ -2317,7 +2479,7 @@ const schema = new SchemaBuilder()
 ```typescript
 // ✅ Good - composable
 const base = new SchemaBuilder().object().properties({...});
-const extended = base.extend().properties({...}).build();
+const extended = new SchemaBuilder().extend(base).properties({...}).build();
 ```
 
 ### 6. Add Error Messages for User-Facing Validation
@@ -2342,9 +2504,9 @@ const extended = base.extend().properties({...}).build();
 ```typescript
 // Creates type: ["string", "number", "null"]
 new SchemaBuilder()
-  .string()
-  .number()
   .null()
+  .number()
+  .string()
   .minLength(5) // Only applied when value is string
   .build();
 ```
@@ -2443,75 +2605,69 @@ const idSchema = new SchemaBuilder()
 | `.null()`    | `NullSchema`          | Set type to null      |
 | `.array()`   | `ArraySchemaBuilder`  | Set type to array     |
 | `.object()`  | `ObjectSchemaBuilder` | Set type to object    |
-| `.end()`     | `SchemaBuilder`       | Reset to base builder |
 
 #### Metadata Methods
 
-| Method                 | Description            |
-| ---------------------- | ---------------------- |
-| `.$id(id)`             | Set $id (Draft 6+)     |
-| `.id(id)`              | Set id (Draft 4)       |
-| `.$schema(uri)`        | Set $schema            |
-| `.title(title)`        | Set title              |
-| `.description(desc)`   | Set description        |
-| `.default(value)`      | Set default value      |
-| `.examples(...values)` | Set examples           |
-| `.readOnly()`          | Set readOnly: true     |
-| `.writeOnly()`         | Set writeOnly: true    |
-| `.option(key, value)`  | Set any custom keyword |
+| Method                    | Parameters        | Description            |
+| ------------------------- | ----------------- | ---------------------- |
+| `.$id(id)`                | `string`          | Set $id (Draft 6+)     |
+| `.$schema(uri)`           | `string`          | Set $schema            |
+| `.$anchor(name)`          | `string`          | Set $anchor            |
+| `.$dynamicAnchor(name)`   | `string`          | Set $dynamicAnchor     |
+| `.title(title)`           | `string`          | Set title              |
+| `.description(desc)`      | `string`          | Set description        |
+| `.default(value)`         | `any`             | Set default value      |
+| `.examples(...values)`    | `any[]`           | Set examples           |
+| `.option(key, value)`     | `string, any`     | Set any custom keyword |
 
 #### Value Constraint Methods
 
-| Method          | Description              |
-| --------------- | ------------------------ |
-| `.enum(values)` | Set allowed values       |
-| `.const(value)` | Set single allowed value |
+| Method          | Parameters            | Description              |
+| --------------- | --------------------- | ------------------------ |
+| `.enum(values)` | `any[]` or `$data`    | Set allowed values       |
+| `.const(value)` | `any`                 | Set single allowed value |
 
 #### Composition Methods
 
-| Method               | Description               |
-| -------------------- | ------------------------- |
-| `.not(schema)`       | Negate a schema           |
-| `.anyOf(...schemas)` | Match at least one schema |
-| `.allOf(...schemas)` | Match all schemas         |
-| `.oneOf(...schemas)` | Match exactly one schema  |
+| Method               | Parameters                                                        | Description               |
+| -------------------- | ----------------------------------------------------------------- | ------------------------- |
+| `.not(schema)`       | `BuilderSchema` or `(b: SchemaBuilder) => SchemaBuilder`          | Negate a schema           |
+| `.anyOf(...schemas)` | `BuilderSchema[]` or `((b: SchemaBuilder) => SchemaBuilder)[]`    | Match at least one schema |
+| `.allOf(...schemas)` | `BuilderSchema[]` or `((b: SchemaBuilder) => SchemaBuilder)[]`    | Match all schemas         |
+| `.oneOf(...schemas)` | `BuilderSchema[]` or `((b: SchemaBuilder) => SchemaBuilder)[]`    | Match exactly one schema  |
+
+**Note:** `BuilderSchema = SchemaDefinition | SchemaBuilder<any> | boolean`
 
 #### Conditional Methods
 
-| Method               | Returns            | Description                   |
-| -------------------- | ------------------ | ----------------------------- |
-| `.if(condition)`     | `ConditionBuilder` | Start conditional             |
-| `.then(schema)`      | `ConditionBuilder` | Schema if condition passes    |
-| `.elseIf(condition)` | `ConditionBuilder` | Additional condition          |
-| `.else(schema)`      | Parent builder     | Schema if all conditions fail |
-| `.end()`             | Parent builder     | End conditional block         |
+| Method               | Parameters                                           | Returns            | Description                   |
+| -------------------- | ---------------------------------------------------- | ------------------ | ----------------------------- |
+| `.if(condition)`     | `BuilderSchema` or `(b: SchemaBuilder) => SchemaBuilder` | `ConditionBuilder` | Start conditional             |
 
 #### Reference Methods
 
-| Method                  | Description                     |
-| ----------------------- | ------------------------------- |
-| `.$ref(ref)`            | Set $ref (string or RefBuilder) |
-| `.$dynamicRef(ref)`     | Set $dynamicRef                 |
-| `.$anchor(name)`        | Set $anchor                     |
-| `.$dynamicAnchor(name)` | Set $dynamicAnchor              |
-| `.$defs(defs)`          | Set $defs (Draft 2019-09+)      |
-| `.definitions(defs)`    | Set definitions (Draft 04-07)   |
+| Method                  | Parameters                                        | Description                     |
+| ----------------------- | ------------------------------------------------- | ------------------------------- |
+| `.$ref(ref)`            | `string` or `RefBuilder` or `(r: RefBuilder) => RefBuilder` | Set $ref                        |
+| `.$dynamicRef(ref)`     | `string` or `RefBuilder` or `(r: RefBuilder) => RefBuilder` | Set $dynamicRef                 |
+| `.$defs(defs)`          | `Record<string, BuilderSchema>` or `Record<string, (b: SchemaBuilder) => SchemaBuilder>` | Set $defs (Draft 2019-09+)      |
+| `.definitions(defs)`    | `Record<string, BuilderSchema>` or `Record<string, (b: SchemaBuilder) => SchemaBuilder>` | Set definitions (Draft 04-07)   |
 
 #### Error Message Methods
 
-| Method               | Description                                 |
-| -------------------- | ------------------------------------------- |
-| `.errorMessage(msg)` | Set custom error message (string or object) |
+| Method               | Parameters                                        | Description                                 |
+| -------------------- | ------------------------------------------------- | ------------------------------------------- |
+| `.errorMessage(msg)` | `string` or `Record<string, string \| Record<string, string>>` | Set custom error message |
 
 #### Utility Methods
 
-| Method          | Description                    |
-| --------------- | ------------------------------ |
-| `.build()`      | Return the final schema object |
-| `.extend()`     | Clone schema for modification  |
-| `.json(schema)` | Load from JSON object/string   |
-| `.url(url)`     | Load from URL (async)          |
-| `.file(path)`   | Load from file (async)         |
+| Method          | Parameters                  | Returns                   | Description                    |
+| --------------- | --------------------------- | ------------------------- | ------------------------------ |
+| `.build()`      | -                           | `S`                       | Return the final schema object |
+| `.extend(schema)` | `BuilderSchema`           | `SchemaBuilder`           | Extend from existing schema    |
+| `.json(schema)` | `SchemaDefinition` or `string` | `SchemaBuilder`        | Load from JSON object/string   |
+| `.url(url)`     | `string`                    | `Promise<SchemaBuilder>`  | Load from URL (async)          |
+| `.file(path)`   | `string`                    | `Promise<SchemaBuilder>`  | Load from file (async)         |
 
 ---
 
@@ -2519,12 +2675,12 @@ const idSchema = new SchemaBuilder()
 
 Inherits all SchemaBuilder methods, plus:
 
-| Method            | Description                                     |
-| ----------------- | ----------------------------------------------- |
-| `.minLength(n)`   | Minimum string length                           |
-| `.maxLength(n)`   | Maximum string length                           |
-| `.pattern(regex)` | Regex pattern (string or RegExp)                |
-| `.format(name)`   | Format validation (email, uri, date-time, etc.) |
+| Method            | Parameters              | Returns           | Description                                     |
+| ----------------- | ----------------------- | ----------------- | ----------------------------------------------- |
+| `.minLength(len)` | `number` or `$data`     | `SchemaBuilder`   | Minimum string length                           |
+| `.maxLength(len)` | `number` or `$data`     | `SchemaBuilder`   | Maximum string length                           |
+| `.pattern(regex)` | `string` or `RegExp` or `$data` | `SchemaBuilder`   | Regex pattern                                   |
+| `.format(name)`   | `string` or `$data`     | `SchemaBuilder`   | Format validation (email, uri, date-time, etc.) |
 
 ---
 
@@ -2532,16 +2688,16 @@ Inherits all SchemaBuilder methods, plus:
 
 Inherits all SchemaBuilder methods, plus:
 
-| Method                 | Description                     |
-| ---------------------- | ------------------------------- |
-| `.minimum(n)`          | Minimum value (inclusive)       |
-| `.maximum(n)`          | Maximum value (inclusive)       |
-| `.exclusiveMinimum(n)` | Minimum value (exclusive)       |
-| `.exclusiveMaximum(n)` | Maximum value (exclusive)       |
-| `.multipleOf(n)`       | Must be multiple of n           |
-| `.positive()`          | Shorthand for minimum(0)        |
-| `.negative()`          | Shorthand for maximum(0)        |
-| `.range(min, max)`     | Shorthand for minimum + maximum |
+| Method                 | Parameters          | Returns         | Description                     |
+| ---------------------- | ------------------- | --------------- | ------------------------------- |
+| `.minimum(n)`          | `number` or `$data` | `SchemaBuilder` | Minimum value (inclusive)       |
+| `.maximum(n)`          | `number` or `$data` | `SchemaBuilder` | Maximum value (inclusive)       |
+| `.exclusiveMinimum(n)` | `number` or `$data` | `SchemaBuilder` | Minimum value (exclusive)       |
+| `.exclusiveMaximum(n)` | `number` or `$data` | `SchemaBuilder` | Maximum value (exclusive)       |
+| `.multipleOf(n)`       | `number` or `$data` | `SchemaBuilder` | Must be multiple of n           |
+| `.positive()`          | -                   | `SchemaBuilder` | Shorthand for minimum(0)        |
+| `.negative()`          | -                   | `SchemaBuilder` | Shorthand for maximum(0)        |
+| `.range(min, max)`     | `number` or `$data`, `number` or `$data` | `SchemaBuilder` | Shorthand for minimum + maximum |
 
 ---
 
@@ -2549,18 +2705,18 @@ Inherits all SchemaBuilder methods, plus:
 
 Inherits all SchemaBuilder methods, plus:
 
-| Method                      | Description                                             |
-| --------------------------- | ------------------------------------------------------- |
-| `.items(schema)`            | Schema for all items (or array of schemas for Draft 07) |
-| `.prefixItems(schemas[])`   | Tuple validation (Draft 2020-12)                        |
-| `.additionalItems(schema)`  | Schema for items beyond tuple (Draft 07)                |
-| `.unevaluatedItems(schema)` | Schema for unevaluated items (Draft 2019-09+)           |
-| `.contains(schema)`         | Array must contain matching item                        |
-| `.minContains(n)`           | Minimum matching items                                  |
-| `.maxContains(n)`           | Maximum matching items                                  |
-| `.minItems(n)`              | Minimum array length                                    |
-| `.maxItems(n)`              | Maximum array length                                    |
-| `.uniqueItems(bool)`        | Require unique items                                    |
+| Method                      | Parameters                                                | Returns         | Description                                             |
+| --------------------------- | --------------------------------------------------------- | --------------- | ------------------------------------------------------- |
+| `.items(...schemas)`        | `BuilderSchema[]` or `((b: SchemaBuilder) => SchemaBuilder)[]` | `SchemaBuilder` | Schema for all items (or tuple for Draft 07)           |
+| `.prefixItems(...schemas)`  | `BuilderSchema[]` or `((b: SchemaBuilder) => SchemaBuilder)[]` | `SchemaBuilder` | Tuple validation (Draft 2020-12)                        |
+| `.additionalItems(schema)`  | `BuilderSchema` or `(b: SchemaBuilder) => SchemaBuilder`  | `SchemaBuilder` | Schema for items beyond tuple (Draft 07)                |
+| `.unevaluatedItems(schema)` | `BuilderSchema` or `(b: SchemaBuilder) => SchemaBuilder`  | `SchemaBuilder` | Schema for unevaluated items (Draft 2019-09+)           |
+| `.contains(schema)`         | `BuilderSchema` or `(b: SchemaBuilder) => SchemaBuilder`  | `SchemaBuilder` | Array must contain matching item                        |
+| `.minContains(n)`           | `number` or `$data`                                       | `SchemaBuilder` | Minimum matching items                                  |
+| `.maxContains(n)`           | `number` or `$data`                                       | `SchemaBuilder` | Maximum matching items                                  |
+| `.minItems(n)`              | `number` or `$data`                                       | `SchemaBuilder` | Minimum array length                                    |
+| `.maxItems(n)`              | `number` or `$data`                                       | `SchemaBuilder` | Maximum array length                                    |
+| `.uniqueItems(value)`       | `boolean` or `$data`                                      | `SchemaBuilder` | Require unique items                                    |
 
 ---
 
@@ -2568,70 +2724,133 @@ Inherits all SchemaBuilder methods, plus:
 
 Inherits all SchemaBuilder methods, plus:
 
-| Method                           | Description                                        |
-| -------------------------------- | -------------------------------------------------- |
-| `.properties(props)`             | Define property schemas                            |
-| `.patternProperties(patterns)`   | Define pattern-matched property schemas            |
-| `.additionalProperties(schema)`  | Schema for additional properties                   |
-| `.unevaluatedProperties(schema)` | Schema for unevaluated properties (Draft 2019-09+) |
-| `.propertyNames(schema)`         | Schema for property names                          |
-| `.required(fields[])`            | Required property names                            |
-| `.minProperties(n)`              | Minimum property count                             |
-| `.maxProperties(n)`              | Maximum property count                             |
-| `.dependentRequired(deps)`       | Conditional required fields                        |
-| `.dependentSchemas(deps)`        | Conditional schemas (Draft 2019-09+)               |
-| `.dependencies(deps)`            | Combined dependencies (Draft 07)                   |
-| `.remove(fields[], targets[])`   | Remove properties from schema                      |
-| `.optional()`                    | Remove all required constraints                    |
+| Method                           | Parameters                                                | Returns         | Description                                        |
+| -------------------------------- | --------------------------------------------------------- | --------------- | -------------------------------------------------- |
+| `.properties(props)`             | `Record<string, BuilderSchema>` or `Record<string, (b: SchemaBuilder) => SchemaBuilder>` | `SchemaBuilder` | Define property schemas                            |
+| `.patternProperties(patterns)`   | `Record<string, BuilderSchema>` or `Record<string, (b: SchemaBuilder) => SchemaBuilder>` | `SchemaBuilder` | Define pattern-matched property schemas            |
+| `.additionalProperties(schema)`  | `BuilderSchema` or `(b: SchemaBuilder) => SchemaBuilder`  | `SchemaBuilder` | Schema for additional properties                   |
+| `.unevaluatedProperties(schema)` | `BuilderSchema` or `(b: SchemaBuilder) => SchemaBuilder`  | `SchemaBuilder` | Schema for unevaluated properties (Draft 2019-09+) |
+| `.propertyNames(schema)`         | `BuilderSchema` or `(b: SchemaBuilder) => SchemaBuilder`  | `SchemaBuilder` | Schema for property names                          |
+| `.required(fields)`              | `string[]` or `$data`                                     | `SchemaBuilder` | Required property names                            |
+| `.minProperties(n)`              | `number` or `$data`                                       | `SchemaBuilder` | Minimum property count                             |
+| `.maxProperties(n)`              | `number` or `$data`                                       | `SchemaBuilder` | Maximum property count                             |
+| `.dependentRequired(deps)`       | `Record<string, string[]>`                                | `SchemaBuilder` | Conditional required fields                        |
+| `.dependentSchemas(deps)`        | `Record<string, BuilderSchema>` or `Record<string, (b: SchemaBuilder) => SchemaBuilder>` | `SchemaBuilder` | Conditional schemas (Draft 2019-09+)               |
+| `.dependencies(deps)`            | `Record<string, BuilderSchema \| string[]>` or `Record<string, (b: SchemaBuilder) => SchemaBuilder \| string[]>` | `SchemaBuilder` | Combined dependencies (Draft 07)                   |
+| `.remove(properties, targets?)`  | `string[]`, `("properties" \| "required" \| "patternProperties" \| "dependencies" \| "dependentRequired")[]?` | `SchemaBuilder` | Remove properties from schema                      |
+| `.optional()`                    | -                                                         | `SchemaBuilder` | Remove all required constraints                    |
 
 ---
 
 ### RefBuilder Methods
 
-| Method                        | Description                            |
-| ----------------------------- | -------------------------------------- |
-| `.base(url)`                  | Set base URL                           |
-| `.$defs(name)`                | Add /$defs/name                        |
-| `.definitions(name)`          | Add /definitions/name                  |
-| `.properties(name)`           | Add /properties/name                   |
-| `.patternProperties(pattern)` | Add /patternProperties/pattern         |
-| `.additionalProperties()`     | Add /additionalProperties              |
-| `.unevaluatedProperties()`    | Add /unevaluatedProperties             |
-| `.propertyNames()`            | Add /propertyNames                     |
-| `.dependentSchemas(prop)`     | Add /dependentSchemas/prop             |
-| `.dependencies(prop)`         | Add /dependencies/prop                 |
-| `.items(index?)`              | Add /items or /items/index             |
-| `.prefixItems(index)`         | Add /prefixItems/index                 |
-| `.additionalItems()`          | Add /additionalItems                   |
-| `.unevaluatedItems()`         | Add /unevaluatedItems                  |
-| `.contains()`                 | Add /contains                          |
-| `.allOf(index)`               | Add /allOf/index                       |
-| `.anyOf(index)`               | Add /anyOf/index                       |
-| `.oneOf(index)`               | Add /oneOf/index                       |
-| `.not()`                      | Add /not                               |
-| `.if()`                       | Add /if                                |
-| `.then()`                     | Add /then                              |
-| `.else()`                     | Add /else                              |
-| `.elseIf(index)`              | Add /elseIf/index                      |
-| `.anchor(name)`               | Set anchor reference                   |
-| `.dynamicAnchor(name)`        | Set dynamic anchor reference           |
-| `.segment(path)`              | Add custom path segment                |
-| `.reset()`                    | Clear path back to base                |
-| `.extend()`                   | Clone RefBuilder                       |
-| `.chain()`                    | Return self (for external composition) |
-| `.build()`                    | Return the reference string            |
-| `.toString()`                 | Alias for build()                      |
+| Method                        | Parameters | Returns       | Description                            |
+| ----------------------------- | ---------- | ------------- | -------------------------------------- |
+| `.base(url)`                  | `string`   | `RefBuilder`  | Set base URL                           |
+| `.$defs(name)`                | `string`   | `RefBuilder`  | Add /$defs/name                        |
+| `.definitions(name)`          | `string`   | `RefBuilder`  | Add /definitions/name                  |
+| `.properties(name)`           | `string`   | `RefBuilder`  | Add /properties/name                   |
+| `.patternProperties(pattern)` | `string`   | `RefBuilder`  | Add /patternProperties/pattern         |
+| `.additionalProperties()`     | -          | `RefBuilder`  | Add /additionalProperties              |
+| `.unevaluatedProperties()`    | -          | `RefBuilder`  | Add /unevaluatedProperties             |
+| `.propertyNames()`            | -          | `RefBuilder`  | Add /propertyNames                     |
+| `.dependentSchemas(prop)`     | `string`   | `RefBuilder`  | Add /dependentSchemas/prop             |
+| `.dependencies(prop)`         | `string`   | `RefBuilder`  | Add /dependencies/prop                 |
+| `.items(index?)`              | `number?`  | `RefBuilder`  | Add /items or /items/index             |
+| `.prefixItems(index)`         | `number`   | `RefBuilder`  | Add /prefixItems/index                 |
+| `.additionalItems()`          | -          | `RefBuilder`  | Add /additionalItems                   |
+| `.unevaluatedItems()`         | -          | `RefBuilder`  | Add /unevaluatedItems                  |
+| `.contains()`                 | -          | `RefBuilder`  | Add /contains                          |
+| `.allOf(index)`               | `number`   | `RefBuilder`  | Add /allOf/index                       |
+| `.anyOf(index)`               | `number`   | `RefBuilder`  | Add /anyOf/index                       |
+| `.oneOf(index)`               | `number`   | `RefBuilder`  | Add /oneOf/index                       |
+| `.not()`                      | -          | `RefBuilder`  | Add /not                               |
+| `.if()`                       | -          | `RefBuilder`  | Add /if                                |
+| `.then()`                     | -          | `RefBuilder`  | Add /then                              |
+| `.else()`                     | -          | `RefBuilder`  | Add /else                              |
+| `.elseIf(index)`              | `number`   | `RefBuilder`  | Add /elseIf/index                      |
+| `.anchor(name)`               | `string`   | `RefBuilder`  | Set anchor reference                   |
+| `.dynamicAnchor(name)`        | `string`   | `RefBuilder`  | Set dynamic anchor reference           |
+| `.segment(path)`              | `string`   | `RefBuilder`  | Add custom path segment                |
+| `.reset()`                    | -          | `RefBuilder`  | Clear path back to base                |
+| `.extend()`                   | -          | `RefBuilder`  | Clone RefBuilder                       |
+| `.chain()`                    | -          | `RefBuilder`  | Return self (for external composition) |
+| `.build()`                    | -          | `string`      | Return the reference string            |
+| `.toString()`                 | -          | `string`      | Alias for build()                      |
 
 ---
 
 ### ConditionBuilder Methods
 
-| Method               | Returns            | Description                   |
-| -------------------- | ------------------ | ----------------------------- |
-| `.then(schema)`      | `ConditionBuilder` | Schema if condition passes    |
-| `.elseIf(condition)` | `ConditionBuilder` | Add another condition         |
-| `.else(schema)`      | Parent builder     | Schema if all conditions fail |
-| `.end()`             | Parent builder     | End conditional without else  |
+| Method               | Parameters                                           | Returns            | Description                   |
+| -------------------- | ---------------------------------------------------- | ------------------ | ----------------------------- |
+| `.then(schema)`      | `BuilderSchema` or `(b: SchemaBuilder) => SchemaBuilder` | `ConditionBuilder` | Schema if condition passes    |
+| `.elseIf(condition)` | `BuilderSchema` or `(b: SchemaBuilder) => SchemaBuilder` | `ConditionBuilder` | Add another condition         |
+| `.else(schema)`      | `BuilderSchema` or `(b: SchemaBuilder) => SchemaBuilder` | Parent builder     | Schema if all conditions fail |
+| `.end()`             | -                                                    | Parent builder     | End conditional without else  |
+
+---
+
+### Type Definitions
+
+```typescript
+// Core types
+type BuilderSchema = SchemaDefinition | SchemaBuilder<any> | boolean;
+
+// $data reference for dynamic values
+type $data = { $data: string };
+
+// Schema callback pattern
+type SchemaCallback = (builder: SchemaBuilder) => SchemaBuilder;
+```
+
+---
+
+### Common Patterns
+
+#### Inline Schema Definition
+```typescript
+.properties({
+  name: (s) => s.string(),
+  age: (s) => s.number()
+})
+```
+
+#### Reusable Schema
+```typescript
+const nameSchema = new SchemaBuilder().string().build();
+
+.properties({
+  name: nameSchema
+})
+```
+
+#### Boolean Schemas
+```typescript
+.properties({
+  allowAny: true,      // Accepts any value
+  rejectAll: false     // Rejects all values
+})
+```
+
+#### Composition Patterns
+```typescript
+// Using callbacks
+.allOf(
+  (s) => s.object().properties({ id: (s) => s.number() }),
+  (s) => s.object().properties({ name: (s) => s.string() })
+)
+
+// Using existing schemas
+const baseSchema = new SchemaBuilder().object().build();
+.allOf(baseSchema, otherSchema)
+
+// Mixed
+.oneOf(
+  baseSchema,
+  (s) => s.object().properties({ type: (s) => s.const('custom') })
+)
+```
 
 ## Next Steps
 

@@ -5,561 +5,665 @@ import { StringSchemaBuilder } from "./types/string-schema";
 import { ObjectSchemaBuilder } from "./types/object-schema";
 import { NumberSchemaBuilder } from "./types/number-schema";
 import * as fs from "fs/promises";
-import { BuilderSchema } from "./types/base-schema";
+import { BaseSchemaBuilder, BuilderSchema } from "./types/base-schema";
 import { BooleanSchema, NullSchema } from "./types/general";
 import { RefBuilder } from "./ref-builder";
+import { AddType, ResolveBuildType, Simplify } from "./types/helpers";
 
-export class SchemaBuilder {
-  protected schema: SchemaDefinition = {};
+export class SchemaBuilder<
+  S extends object = {},
+> implements BaseSchemaBuilder<S> {
+  protected schema: any = {};
+
+  constructor(initialSchema?: S) {
+    if (initialSchema) this.schema = initialSchema;
+  }
+
   private addType(type: BaseType): void {
-    if (!this.schema.type) {
-      this.schema.type = type;
-    } else if (Array.isArray(this.schema.type)) {
-      if (!this.schema.type.includes(type)) {
-        this.schema.type.push(type);
-      }
+    const s = this.schema as any;
+    if (!s.type) {
+      s.type = type;
+    } else if (Array.isArray(s.type)) {
+      if (!s.type.includes(type)) s.type.push(type);
     } else {
-      if (this.schema.type !== type) {
-        this.schema.type = [this.schema.type, type];
-      }
+      if (s.type !== type) s.type = [s.type, type];
     }
   }
-  $schema($schema: string): SchemaBuilder {
-    this.schema.$schema = $schema;
-    return this;
+
+  //#region Base region
+  $schema<B extends string>(v: B): SchemaBuilder<S> {
+    (this.schema as any).$schema = v;
+    return this as any;
+  }
+  $id<B extends string>(v: B): SchemaBuilder<S> {
+    (this.schema as any).$id = v;
+    return this as any;
+  }
+  $anchor<B extends string>(v: B): SchemaBuilder<S> {
+    (this.schema as any).$anchor = v;
+    return this as any;
+  }
+  $dynamicAnchor<B extends string>(val: B): SchemaBuilder<S> {
+    (this.schema as any).$dynamicAnchor = val;
+    return this as any;
+  }
+  title<B extends string>(v: B): SchemaBuilder<S> {
+    (this.schema as any).title = v;
+    return this as any;
+  }
+  description<B extends string>(v: B): SchemaBuilder<S> {
+    (this.schema as any).description = v;
+    return this as any;
+  }
+  default<B>(v: B): SchemaBuilder<S> {
+    (this.schema as any).default = v;
+    return this as any;
   }
 
-  $id($id: string): SchemaBuilder {
-    this.schema.$id = $id;
-    return this;
+  examples(ex: any): SchemaBuilder<S> {
+    (this.schema as any).examples = ex;
+    return this as any;
   }
 
-  $ref(builder: RefBuilder | ((ref: RefBuilder) => RefBuilder) | string): this {
-    if (typeof builder === "string") {
-      this.schema.$ref = builder;
-    } else if (builder instanceof RefBuilder) {
-      this.schema.$ref = builder.build();
-    } else {
-      this.schema.$ref = builder(new RefBuilder()).build();
-    }
-    return this;
+  readOnly(): SchemaBuilder<S> {
+    this.schema.readOnly = true;
+    return this as any;
   }
 
-  $dynamicRef(
-    builder: RefBuilder | ((ref: RefBuilder) => RefBuilder) | string,
-  ): this {
-    if (typeof builder === "string") {
-      this.schema.$dynamicRef = builder;
-    } else if (builder instanceof RefBuilder) {
-      this.schema.$dynamicRef = builder.build();
-    } else {
-      this.schema.$dynamicRef = builder(new RefBuilder()).build();
-    }
-    return this;
+  writeOnly(): SchemaBuilder<S> {
+    this.schema.writeOnly = true;
+    return this as any;
   }
 
-  $anchor($anchor: string): SchemaBuilder {
-    this.schema.$anchor = $anchor;
-    return this;
+  $ref<B extends string | RefBuilder | ((r: RefBuilder) => RefBuilder)>(
+    builder: B,
+  ): SchemaBuilder<Simplify<S & { $ref: string }>> {
+    (this.schema as any).$ref =
+      typeof builder === "string"
+        ? builder
+        : builder instanceof RefBuilder
+          ? builder.build()
+          : builder(new RefBuilder()).build();
+    return this as any;
   }
 
-  $dynamicAnchor($dynamicAnchor: string): SchemaBuilder {
-    this.schema.$dynamicAnchor = $dynamicAnchor;
-    return this;
+  $dynamicRef<B extends string | RefBuilder | ((r: RefBuilder) => RefBuilder)>(
+    builder: B,
+  ): SchemaBuilder<S> {
+    (this.schema as any).$dynamicRef =
+      typeof builder === "string"
+        ? builder
+        : builder instanceof RefBuilder
+          ? builder.build()
+          : builder(new RefBuilder()).build();
+    return this as any;
   }
 
-  $defs(
-    $defs: Record<
+  $defs<
+    B extends Record<
       string,
       BuilderSchema | ((builder: SchemaBuilder) => SchemaBuilder)
     >,
-  ): SchemaBuilder {
-    if (!this.schema.$defs) this.schema.$defs = {};
-    Object.entries($defs).forEach(([prop, schema]) => {
-      (this.schema.$defs as any)[prop] =
-        typeof schema === "function"
-          ? schema(new SchemaBuilder()).build()
-          : schema instanceof SchemaBuilder
-            ? schema.build()
-            : schema;
-    });
-    return this;
-  }
-  definitions(
-    defs: Record<
-      string,
-      BuilderSchema | ((builder: SchemaBuilder) => SchemaBuilder)
-    >,
-  ): SchemaBuilder {
-    if (!this.schema.definitions) this.schema.definitions = {};
+  >(defs: B): SchemaBuilder<S> {
+    if (!(this.schema as any).$defs) (this.schema as any).$defs = {};
     Object.entries(defs).forEach(([prop, schema]) => {
-      (this.schema.definitions as any)[prop] =
+      (this.schema as any).$defs[prop] =
         typeof schema === "function"
           ? schema(new SchemaBuilder()).build()
           : schema instanceof SchemaBuilder
             ? schema.build()
             : schema;
     });
-    return this;
+    return this as any;
   }
 
-  enum(values: string[] | $data): SchemaBuilder {
-    this.schema.enum = values;
-    return this;
+  definitions<
+    B extends Record<
+      string,
+      BuilderSchema | ((builder: SchemaBuilder) => SchemaBuilder)
+    >,
+  >(defs: B): SchemaBuilder<S> {
+    if (!(this.schema as any).definitions)
+      (this.schema as any).definitions = {};
+    Object.entries(defs).forEach(([prop, schema]) => {
+      (this.schema as any).definitions[prop] =
+        typeof schema === "function"
+          ? schema(new SchemaBuilder()).build()
+          : schema instanceof SchemaBuilder
+            ? schema.build()
+            : schema;
+    });
+    return this as any;
   }
 
-  const(value: string | $data): SchemaBuilder {
-    this.schema.const = value;
-    return this;
+  anyOf<T extends (BuilderSchema | ((b: SchemaBuilder) => SchemaBuilder))[]>(
+    ...schemas: T
+  ): SchemaBuilder<Simplify<Omit<S, "anyOf"> & { anyOf: T }>> {
+    (this.schema as any).anyOf = schemas.map((s) =>
+      typeof s === "function"
+        ? s(new SchemaBuilder()).build()
+        : s instanceof SchemaBuilder
+          ? s.build()
+          : s,
+    );
+    return this as any;
   }
 
-  not(
-    schema: BuilderSchema | ((builder: SchemaBuilder) => SchemaBuilder),
-  ): SchemaBuilder {
-    this.schema.not =
+  allOf<T extends (BuilderSchema | ((b: SchemaBuilder) => SchemaBuilder))[]>(
+    ...schemas: T
+  ): SchemaBuilder<Simplify<Omit<S, "allOf"> & { allOf: T }>> {
+    (this.schema as any).allOf = schemas.map((s) =>
+      typeof s === "function"
+        ? s(new SchemaBuilder()).build()
+        : s instanceof SchemaBuilder
+          ? s.build()
+          : s,
+    );
+    return this as any;
+  }
+
+  oneOf<T extends (BuilderSchema | ((b: SchemaBuilder) => SchemaBuilder))[]>(
+    ...schemas: T
+  ): SchemaBuilder<
+    Simplify<Omit<S, "oneOf"> & { oneOf: { [K in keyof T]: T[K] } }>
+  > {
+    (this.schema as any).oneOf = schemas.map((s) =>
+      typeof s === "function"
+        ? s(new SchemaBuilder()).build()
+        : s instanceof SchemaBuilder
+          ? s.build()
+          : s,
+    );
+    return this as any;
+  }
+
+  not<B extends BuilderSchema | ((b: SchemaBuilder) => SchemaBuilder)>(
+    schema: B,
+  ): SchemaBuilder<S> {
+    (this.schema as any).not =
       typeof schema === "function"
         ? schema(new SchemaBuilder()).build()
         : schema instanceof SchemaBuilder
           ? schema.build()
           : schema;
-    return this as any as SchemaBuilder;
+    return this as any;
   }
 
-  anyOf(
-    ...schemas: (BuilderSchema | ((builder: SchemaBuilder) => SchemaBuilder))[]
-  ): SchemaBuilder {
-    const schemaList = schemas.map((s) => {
-      return typeof s === "function"
-        ? s(new SchemaBuilder()).build()
-        : s instanceof SchemaBuilder
-          ? s.build()
-          : s;
-    });
-    this.schema.anyOf = schemaList;
-    return this as any as SchemaBuilder;
-  }
-
-  allOf(
-    ...schemas: (BuilderSchema | ((builder: SchemaBuilder) => SchemaBuilder))[]
-  ): SchemaBuilder {
-    const schemaList = schemas.map((s) => {
-      return typeof s === "function"
-        ? s(new SchemaBuilder()).build()
-        : s instanceof SchemaBuilder
-          ? s.build()
-          : s;
-    });
-    this.schema.allOf = schemaList;
-    return this as any as SchemaBuilder;
-  }
-
-  oneOf(
-    ...schemas: (BuilderSchema | ((builder: SchemaBuilder) => SchemaBuilder))[]
-  ): SchemaBuilder {
-    const schemaList = schemas.map((s) => {
-      return typeof s === "function"
-        ? s(new SchemaBuilder()).build()
-        : s instanceof SchemaBuilder
-          ? s.build()
-          : s;
-    });
-    this.schema.oneOf = schemaList;
-    return this as any as SchemaBuilder;
-  }
-
-  option(key: string, value: any): SchemaBuilder {
-    this.schema[key] = value;
-    return this as any as SchemaBuilder;
-  }
-
-  if(
-    condition: BuilderSchema | ((builder: SchemaBuilder) => SchemaBuilder),
-  ): ConditionBuilder<this> {
+  if<B extends BuilderSchema | ((b: SchemaBuilder) => SchemaBuilder)>(
+    condition: B,
+  ): ConditionBuilder<
+    Omit<S, "if" | "then" | "elseIf" | "else"> & { if: B },
+    SchemaBuilder<S>,
+    B
+  > {
     const resolved =
       typeof condition === "function"
         ? condition(new SchemaBuilder()).build()
         : condition instanceof SchemaBuilder
           ? condition.build()
           : condition;
-    return new ConditionBuilder(this, resolved);
+    return new ConditionBuilder(this, resolved) as any;
   }
 
-  title(title: string): SchemaBuilder {
-    this.schema.title = title;
-    return this;
+  enum<const B extends any[] | $data>(
+    values: B,
+  ): SchemaBuilder<Simplify<Omit<S, "enum"> & { enum: B }>> {
+    (this.schema as any).enum = values;
+    return this as any;
   }
 
-  description(desc: string): SchemaBuilder {
-    this.schema.description = desc;
-    return this;
+  const<const B extends any | $data>(
+    value: B,
+  ): SchemaBuilder<Simplify<Omit<S, "const"> & { const: B }>> {
+    (this.schema as any).const = value;
+    return this as any;
   }
 
-  examples(...examples: any[]): SchemaBuilder {
-    this.schema.examples = examples;
-    return this;
+  boolean(): BooleanSchema<AddType<S, "boolean">> {
+    this.addType("boolean");
+    return this as any;
   }
 
-  default(value: any): SchemaBuilder {
-    this.schema.default = value;
-    return this;
+  null(): NullSchema<AddType<S, "null">> {
+    this.addType("null");
+    return this as any;
   }
+  //#endregion
 
-  readOnly(): SchemaBuilder {
-    this.schema.readOnly = true;
-    return this;
-  }
-
-  writeOnly(): SchemaBuilder {
-    this.schema.writeOnly = true;
-    return this;
-  }
-
-  errorMessage(
-    message: string | Record<string, string | Record<string, string>>,
-  ): SchemaBuilder {
-    this.schema.errorMessage = message;
-    return this;
-  }
-
-  async url(url: string): Promise<SchemaBuilder> {
-    try {
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(
-          `Failed to fetch schema from ${url}: ${response.status} ${response.statusText}`,
-        );
-      }
-      const jsonSchema = await response.json();
-      this.schema = jsonSchema;
-      return this as any as SchemaBuilder;
-    } catch (error: any) {
-      throw new Error(`Error loading schema from URL ${url}: ${error.message}`);
-    }
-  }
-
-  extend(): SchemaBuilder {
-    const res = structuredClone(this.schema) as SchemaDefinition;
-    const builder = new SchemaBuilder();
-    builder.schema = res;
-    return builder;
-  }
-
-  async file(filePath: string): Promise<SchemaBuilder> {
-    try {
-      const fileContent = await fs.readFile(filePath, "utf-8");
-      const jsonSchema = JSON.parse(fileContent);
-      this.schema = jsonSchema;
-      return this as any as SchemaBuilder;
-    } catch (error: any) {
-      if (error.code === "ENOENT") {
-        throw new Error(`Schema file not found: ${filePath}`);
-      }
-      if (error instanceof SyntaxError) {
-        throw new Error(
-          `Invalid JSON in schema file ${filePath}: ${error.message}`,
-        );
-      }
-      throw new Error(
-        `Error loading schema from file ${filePath}: ${error.message}`,
-      );
-    }
-  }
-
-  json(jsonSchema: object | string): SchemaBuilder {
-    try {
-      const schema =
-        typeof jsonSchema === "string" ? JSON.parse(jsonSchema) : jsonSchema;
-
-      if (typeof schema !== "object" || schema === null) {
-        throw new Error("Invalid schema: must be an object");
-      }
-
-      this.schema = schema;
-      return this as any as SchemaBuilder;
-    } catch (error: any) {
-      if (error instanceof SyntaxError) {
-        throw new Error(`Invalid JSON schema string: ${error.message}`);
-      }
-      throw new Error(`Error processing JSON schema: ${error.message}`);
-    }
-  }
-
-  build(): SchemaDefinition {
-    return structuredClone(this.schema);
-  }
-
-  //#region  String Region
-  string(): StringSchemaBuilder {
+  //#region String region
+  string(): StringSchemaBuilder<AddType<S, "string">> {
+    type b = S;
     this.addType("string");
-    return this as any as StringSchemaBuilder;
+    return this as any;
   }
 
-  minLength(length: number | $data): SchemaBuilder {
-    this.schema.minLength = length;
-    return this;
+  minLength(len: number | $data): SchemaBuilder<S> {
+    (this.schema as any).minLength = len;
+    return this as any;
   }
-
-  maxLength(length: number | $data): SchemaBuilder {
-    this.schema.maxLength = length;
-    return this;
+  maxLength(len: number | $data): SchemaBuilder<S> {
+    (this.schema as any).maxLength = len;
+    return this as any;
   }
-
-  pattern(regex: string | RegExp | $data): SchemaBuilder {
-    this.schema.pattern = regex instanceof RegExp ? regex.source : regex;
-    return this;
+  pattern(re: string | RegExp | $data): SchemaBuilder<S> {
+    (this.schema as any).pattern = re instanceof RegExp ? re.source : re;
+    return this as any;
   }
-
-  format(
-    formatName: string | $data,
-  ): SchemaBuilder {
-    this.schema.format = formatName;
-    return this;
+  format(f: string | $data): SchemaBuilder<S> {
+    (this.schema as any).format = f;
+    return this as any;
   }
 
   //#endregion
 
-  //#region Nunber Region
-  number(): NumberSchemaBuilder {
+  //#region Number region
+
+  number(): NumberSchemaBuilder<AddType<S, "number">> {
     this.addType("number");
-    return this as any as NumberSchemaBuilder;
+    return this as any;
   }
 
-  integer(): NumberSchemaBuilder {
+  integer(): NumberSchemaBuilder<AddType<S, "integer">> {
     this.addType("integer");
-    return this as any as NumberSchemaBuilder;
-  }
-  minimum(min: number | $data): SchemaBuilder {
-    this.schema.minimum = min;
-    return this;
+    return this as any;
   }
 
-  maximum(max: number | $data): SchemaBuilder {
-    this.schema.maximum = max;
-    return this;
+  minimum(v: number | $data): SchemaBuilder<S> {
+    (this.schema as any).minimum = v;
+    return this as any;
   }
-  exclusiveMinimum(min: number | $data): SchemaBuilder {
-    this.schema.exclusiveMinimum = min;
-    return this;
+  maximum(v: number | $data): SchemaBuilder<S> {
+    (this.schema as any).maximum = v;
+    return this as any;
   }
-  exclusiveMaximum(max: number | $data): SchemaBuilder {
-    this.schema.exclusiveMaximum = max;
-    return this;
+  exclusiveMinimum(v: number | $data): SchemaBuilder<S> {
+    (this.schema as any).exclusiveMinimum = v;
+    return this as any;
+  }
+  exclusiveMaximum(v: number | $data): SchemaBuilder<S> {
+    (this.schema as any).exclusiveMaximum = v;
+    return this as any;
+  }
+  multipleOf(v: number | $data): SchemaBuilder<S> {
+    (this.schema as any).multipleOf = v;
+    return this as any;
   }
 
-  multipleOf(value: number | $data): SchemaBuilder {
-    if (value === 0) {
-      throw new Error("multipleOf value cannot be zero");
-    }
-
-    this.schema.multipleOf = value;
-    return this;
-  }
-
-  positive(): SchemaBuilder {
+  positive(): SchemaBuilder<S> {
     return this.minimum(0);
   }
 
-  negative(): SchemaBuilder {
+  negative(): SchemaBuilder<S> {
     return this.maximum(0);
   }
 
-  range(min: number | $data, max: number | $data): SchemaBuilder {
+  range(min: number | $data, max: number | $data): SchemaBuilder<S> {
     return this.minimum(min).maximum(max);
   }
-  //#endregion
-
-  boolean(): BooleanSchema {
-    this.addType("boolean");
-    return this as any as BooleanSchema;
-  }
-
-  null(): NullSchema {
-    this.addType("null");
-    return this as any as NullSchema;
-  }
-
-  //#region Array Region
-  array(): ArraySchemaBuilder {
-    this.addType("array");
-    return this as any as ArraySchemaBuilder;
-  }
-
-  minItems(min: number | $data): SchemaBuilder {
-    this.schema.minItems = min;
-    return this;
-  }
-
-  maxItems(max: number | $data): SchemaBuilder {
-    this.schema.maxItems = max;
-    return this;
-  }
-
-  uniqueItems(value: boolean | $data): SchemaBuilder {
-    this.schema.uniqueItems = value;
-    return this;
-  }
-
-  contains(
-    schema: BuilderSchema | ((builder: SchemaBuilder) => SchemaBuilder),
-  ): SchemaBuilder {
-    this.schema.contains =
-      typeof schema === "function"
-        ? schema(new SchemaBuilder()).build()
-        : schema instanceof SchemaBuilder
-          ? schema.build()
-          : schema;
-    return this;
-  }
-
-  minContains<T>(min: number | $data): SchemaBuilder {
-    this.schema.minContains = min;
-    return this;
-  }
-
-  maxContains(max: number | $data): SchemaBuilder {
-    this.schema.maxContains = max;
-    return this;
-  }
-
-  prefixItems(
-    itemSchema: (BuilderSchema | ((builder: SchemaBuilder) => SchemaBuilder))[],
-  ): SchemaBuilder {
-    this.schema.prefixItems = itemSchema.map((schema) => {
-      return typeof schema === "function"
-        ? schema(new SchemaBuilder()).build()
-        : schema instanceof SchemaBuilder
-          ? schema.build()
-          : schema;
-    });
-    return this;
-  }
-
-  items(
-    itemSchema:
-      | BuilderSchema
-      | ((builder: SchemaBuilder) => SchemaBuilder)
-      | (BuilderSchema | ((builder: SchemaBuilder) => SchemaBuilder))[],
-  ): SchemaBuilder {
-    if (Array.isArray(itemSchema)) {
-      this.schema.items = itemSchema.map((schema) => {
-        return typeof schema === "function"
-          ? schema(new SchemaBuilder()).build()
-          : schema instanceof SchemaBuilder
-            ? schema.build()
-            : schema;
-      });
-    } else {
-      this.schema.items =
-        typeof itemSchema === "function"
-          ? itemSchema(new SchemaBuilder()).build()
-          : itemSchema instanceof SchemaBuilder
-            ? itemSchema.build()
-            : itemSchema;
-    }
-    return this;
-  }
-
-  additionalItems(
-    schema: BuilderSchema | ((builder: SchemaBuilder) => SchemaBuilder),
-  ): SchemaBuilder {
-    if (typeof schema === "boolean") {
-      this.schema.additionalItems = schema;
-    } else {
-      this.schema.additionalItems =
-        typeof schema === "function"
-          ? schema(new SchemaBuilder()).build()
-          : schema instanceof SchemaBuilder
-            ? schema.build()
-            : schema;
-    }
-    return this;
-  }
-
-  unevaluatedItems(
-    schema: BuilderSchema | ((builder: SchemaBuilder) => SchemaBuilder),
-  ): SchemaBuilder {
-    if (typeof schema === "boolean") {
-      this.schema.unevaluatedItems = schema;
-    } else {
-      this.schema.unevaluatedItems =
-        typeof schema === "function"
-          ? schema(new SchemaBuilder()).build()
-          : schema instanceof SchemaBuilder
-            ? schema.build()
-            : schema;
-    }
-    return this;
-  }
 
   //#endregion
 
-  //#region  Object Region
-  object(): ObjectSchemaBuilder {
+  //#region Object region
+
+  object(): ObjectSchemaBuilder<AddType<S, "object">> {
     this.addType("object");
-    return this as any as ObjectSchemaBuilder;
+    return this as any;
   }
 
-  properties(
-    properties: Record<
+  properties<
+    const P extends Record<
       string,
-      BuilderSchema | ((builder: SchemaBuilder) => SchemaBuilder)
+      BuilderSchema | ((b: SchemaBuilder) => SchemaBuilder)
     >,
-  ): SchemaBuilder {
-    if (!this.schema.properties) this.schema.properties = {};
-    Object.entries(properties).forEach(([prop, schema]) => {
-      const resolved =
-        typeof schema === "function"
-          ? schema(new SchemaBuilder()).build()
-          : schema instanceof SchemaBuilder
-            ? schema.build()
-            : schema;
-      (this.schema.properties as any)[prop] = resolved;
+  >(
+    props: P,
+  ): SchemaBuilder<
+    Simplify<
+      Omit<S, "properties"> & {
+        properties: S extends { properties: infer Existing }
+          ? Simplify<Existing & P>
+          : P;
+      }
+    >
+  > {
+    if (!(this.schema as any).properties) (this.schema as any).properties = {};
+    Object.entries(props).forEach(([k, v]) => {
+      (this.schema as any).properties[k] =
+        typeof v === "function"
+          ? v(new SchemaBuilder()).build()
+          : v instanceof SchemaBuilder
+            ? v.build()
+            : v;
     });
+    return this as any;
+  }
+
+  required<const R extends string[] | $data>(
+    fields: R,
+  ): SchemaBuilder<
+    Simplify<
+      Omit<S, "required"> & {
+        required: S extends {
+          required: infer Existing extends readonly string[];
+        }
+          ? R extends string[]
+            ? [...Existing, ...R]
+            : Existing
+          : R;
+      }
+    >
+  > {
+    (this.schema as any).required = Array.isArray(fields)
+      ? [
+          ...(Array.isArray((this.schema as any).required)
+            ? (this.schema as any).required
+            : []),
+          ...fields,
+        ]
+      : fields;
+    return this as any;
+  }
+
+  minProperties(min: number | $data): SchemaBuilder<S> {
+    (this.schema as any).minProperties = min;
     return this;
   }
 
-  required(fields: string[] | $data): SchemaBuilder {
-    if (!this.schema.required) {
-      this.schema.required = [];
-    }
-    if (Array.isArray(this.schema.required) && Array.isArray(fields)) {
-      this.schema.required.push(...fields);
+  maxProperties(max: number | $data): SchemaBuilder<S> {
+    (this.schema as any).maxProperties = max;
+    return this;
+  }
+
+  patternProperties<
+    const P extends Record<
+      string,
+      BuilderSchema | ((b: SchemaBuilder) => SchemaBuilder)
+    >,
+  >(p: P) {
+    if (!(this.schema as any).patternProperties)
+      (this.schema as any).patternProperties = {};
+    Object.entries(p).forEach(([k, v]) => {
+      (this.schema as any).patternProperties[k] =
+        typeof v === "function"
+          ? v(new SchemaBuilder()).build()
+          : v instanceof SchemaBuilder
+            ? v.build()
+            : v;
+    });
+    return this as any as SchemaBuilder<
+      Simplify<
+        Omit<S, "patternProperties"> & {
+          patternProperties: S extends { patternProperties: infer Existing }
+            ? Simplify<Existing & P>
+            : P;
+        }
+      >
+    >;
+  }
+
+  propertyNames<
+    const P extends BuilderSchema | ((b: SchemaBuilder) => SchemaBuilder),
+  >(v: P) {
+    (this.schema as any).propertyNames =
+      typeof v === "function"
+        ? v(new SchemaBuilder()).build()
+        : v instanceof SchemaBuilder
+          ? v.build()
+          : v;
+    return this as any as SchemaBuilder<S>;
+  }
+
+  dependentRequired<const P extends Record<string, string[]>>(d: P) {
+    (this.schema as any).dependentRequired = d;
+    return this as any as SchemaBuilder<S>;
+  }
+
+  dependentSchemas<
+    const P extends Record<
+      string,
+      BuilderSchema | ((builder: SchemaBuilder) => SchemaBuilder)
+    >,
+  >(d: P) {
+    if (!(this.schema as any).dependentSchemas)
+      (this.schema as any).dependentSchemas = {};
+    Object.entries(d).forEach(([k, v]) => {
+      (this.schema as any).dependentSchemas[k] =
+        typeof v === "function"
+          ? v(new SchemaBuilder()).build()
+          : v instanceof SchemaBuilder
+            ? v.build()
+            : v;
+    });
+    return this as any as SchemaBuilder<S>;
+  }
+
+  dependencies<
+    const P extends Record<
+      string,
+      BuilderSchema | ((builder: SchemaBuilder) => SchemaBuilder) | string[]
+    >,
+  >(d: P) {
+    if (!(this.schema as any).dependencies)
+      (this.schema as any).dependencies = {};
+    Object.entries(d).forEach(([k, v]) => {
+      if (Array.isArray(v)) {
+        (this.schema as any).dependencies[k] = v;
+      } else {
+        (this.schema as any).dependencies[k] =
+          typeof v === "function"
+            ? v(new SchemaBuilder()).build()
+            : v instanceof SchemaBuilder
+              ? v.build()
+              : v;
+      }
+    });
+    return this as any as SchemaBuilder<S>;
+  }
+
+  additionalProperties<
+    const P extends BuilderSchema | ((b: SchemaBuilder) => SchemaBuilder),
+  >(v: P) {
+    (this.schema as any).additionalProperties =
+      typeof v === "function"
+        ? v(new SchemaBuilder()).build()
+        : v instanceof SchemaBuilder
+          ? v.build()
+          : v;
+    return this as any as SchemaBuilder<
+      Simplify<
+        Omit<S, "additionalProperties"> & {
+          additionalProperties: P;
+        }
+      >
+    >;
+  }
+
+  unevaluatedProperties<
+    const P extends BuilderSchema | ((b: SchemaBuilder) => SchemaBuilder),
+  >(v: P) {
+    (this.schema as any).unevaluatedProperties =
+      typeof v === "function"
+        ? v(new SchemaBuilder()).build()
+        : v instanceof SchemaBuilder
+          ? v.build()
+          : v;
+    return this as any as SchemaBuilder<
+      Simplify<
+        Omit<S, "unevaluatedProperties"> & {
+          unevaluatedProperties: P;
+        }
+      >
+    >;
+  }
+
+  //#endregion
+
+  //#region Array region
+
+  array(): ArraySchemaBuilder<AddType<S, "array">> {
+    this.addType("array");
+    return this as any;
+  }
+
+  minItems(v: number | $data): SchemaBuilder<S> {
+    (this.schema as any).minItems = v;
+    return this as any;
+  }
+  maxItems(v: number | $data): SchemaBuilder<S> {
+    (this.schema as any).maxItems = v;
+    return this as any;
+  }
+  uniqueItems(v: boolean | $data): SchemaBuilder<S> {
+    (this.schema as any).uniqueItems = v;
+    return this as any;
+  }
+
+  minContains(v: number | $data): SchemaBuilder<S> {
+    (this.schema as any).minContains = v;
+    return this as any;
+  }
+  maxContains(v: number | $data): SchemaBuilder<S> {
+    (this.schema as any).maxContains = v;
+    return this as any;
+  }
+
+  contains<
+    const I extends BuilderSchema | ((b: SchemaBuilder) => SchemaBuilder),
+  >(val: I): SchemaBuilder<S> {
+    (this.schema as any).contains =
+      typeof val === "function"
+        ? val(new SchemaBuilder()).build()
+        : val instanceof SchemaBuilder
+          ? val.build()
+          : val;
+    return this as any;
+  }
+
+  prefixItems<
+    const I extends (BuilderSchema | ((b: SchemaBuilder) => SchemaBuilder))[],
+  >(...v: I) {
+    (this.schema as any).prefixItems = v.map((x) =>
+      typeof x === "function"
+        ? x(new SchemaBuilder()).build()
+        : x instanceof SchemaBuilder
+          ? x.build()
+          : x,
+    );
+    return this as any as SchemaBuilder<
+      Simplify<
+        Omit<S, "prefixItems"> & {
+          prefixItems: I;
+        }
+      >
+    >;
+  }
+
+  items<
+    const I extends (BuilderSchema | ((b: SchemaBuilder) => SchemaBuilder))[],
+  >(
+    ...val: I
+  ): SchemaBuilder<
+    Simplify<
+      Omit<S, "items"> & {
+        items: I extends [infer Single] ? Single : I;
+      }
+    >
+  > {
+    if (val.length === 1) {
+      const single = val[0];
+      (this.schema as any).items =
+        typeof single === "function"
+          ? single(new SchemaBuilder()).build()
+          : single instanceof SchemaBuilder
+            ? single.build()
+            : single;
     } else {
-      this.schema.required = fields;
+      (this.schema as any).items = val.map((s) =>
+        typeof s === "function"
+          ? s(new SchemaBuilder()).build()
+          : s instanceof SchemaBuilder
+            ? s.build()
+            : s,
+      );
     }
-    return this;
+    return this as any;
   }
 
-  patternProperties(
-    patterns: Record<
-      string,
-      BuilderSchema | ((builder: SchemaBuilder) => SchemaBuilder)
-    >,
-  ): SchemaBuilder {
-    if (!this.schema.patternProperties) this.schema.patternProperties = {};
-
-    Object.entries(patterns).forEach(([pattern, schema]) => {
-      (this.schema.patternProperties as any)[pattern] =
-        typeof schema === "function"
-          ? schema(new SchemaBuilder()).build()
-          : schema instanceof SchemaBuilder
-            ? schema.build()
-            : schema;
-    });
-
-    return this;
+  additionalItems<
+    const I extends BuilderSchema | ((b: SchemaBuilder) => SchemaBuilder),
+  >(v: I) {
+    (this.schema as any).additionalItems =
+      typeof v === "function"
+        ? v(new SchemaBuilder()).build()
+        : v instanceof SchemaBuilder
+          ? v.build()
+          : v;
+    return this as any as SchemaBuilder<
+      Simplify<Omit<S, "additionalItems"> & { additionalItems: I }>
+    >;
   }
 
-  remove(
-    properties: string[],
-    additional: (
+  unevaluatedItems<
+    const I extends BuilderSchema | ((b: SchemaBuilder) => SchemaBuilder),
+  >(v: I) {
+    (this.schema as any).unevaluatedItems =
+      typeof v === "function"
+        ? v(new SchemaBuilder()).build()
+        : v instanceof SchemaBuilder
+          ? v.build()
+          : v;
+    return this as any as SchemaBuilder<
+      Simplify<Omit<S, "unevaluatedItems"> & { unevaluatedItems: I }>
+    >;
+  }
+
+  remove<
+    const Fields extends readonly string[],
+    Additional extends (
       | "properties"
       | "required"
       | "patternProperties"
       | "dependencies"
       | "dependentRequired"
     )[] = ["properties"],
-  ): this {
+  >(
+    properties: Fields,
+    additional: Additional = ["properties"] as Additional,
+  ): SchemaBuilder<
+    Simplify<{
+      [K in keyof S]: K extends "properties"
+        ? "properties" extends Additional[number]
+          ? S[K] extends Record<string, any>
+            ? Omit<S[K], Fields[number]>
+            : S[K]
+          : S[K]
+        : K extends "patternProperties"
+          ? "patternProperties" extends Additional[number]
+            ? S[K] extends Record<string, any>
+              ? Omit<S[K], Fields[number]>
+              : S[K]
+            : S[K]
+          : K extends "required"
+            ? "required" extends Additional[number]
+              ? S[K] extends readonly (infer R)[]
+                ? Exclude<R, Fields[number]>[]
+                : S[K]
+              : S[K]
+            : K extends "dependencies"
+              ? "dependencies" extends Additional[number]
+                ? S[K] extends Record<string, any>
+                  ? Omit<S[K], Fields[number]>
+                  : S[K]
+                : S[K]
+              : K extends "dependentRequired"
+                ? "dependentRequired" extends Additional[number]
+                  ? S[K] extends Record<string, any>
+                    ? Omit<S[K], Fields[number]>
+                    : S[K]
+                  : S[K]
+                : S[K];
+    }>
+  > {
     const fields = new Set(properties);
     const removeProperties = additional.includes("properties");
     const removeRequired = additional.includes("required");
@@ -593,121 +697,58 @@ export class SchemaBuilder {
         }
       }
     }
-    return this;
+
+    return this as any;
   }
 
-  optional(): SchemaBuilder {
+  optional(): SchemaBuilder<Simplify<Omit<S, "required">>> {
     delete this.schema.required;
+    return this as any;
+  }
+
+  //#endregion
+
+  //#region  Helpers region
+  async url(url: string): Promise<SchemaBuilder<any>> {
+    const response = await fetch(url);
+    this.schema = await response.json();
+    return this as any;
+  }
+
+  async file(filePath: string): Promise<SchemaBuilder<any>> {
+    const fileContent = await fs.readFile(filePath, "utf-8");
+    this.schema = JSON.parse(fileContent);
+    return this as any;
+  }
+
+  json<const T extends SchemaDefinition>(
+    jsonSchema: T | string,
+  ): SchemaBuilder<Simplify<S & T>> {
+    this.schema =
+      typeof jsonSchema === "string" ? JSON.parse(jsonSchema) : jsonSchema;
+    return this as any;
+  }
+
+  errorMessage(
+    message: string | Record<string, string | Record<string, string>>,
+  ): SchemaBuilder<S> {
+    (this.schema as any).errorMessage = message;
     return this;
   }
 
-  dependentSchemas(
-    deps: Record<
-      string,
-      BuilderSchema | ((builder: SchemaBuilder) => SchemaBuilder)
-    >,
-  ): SchemaBuilder {
-    if (!this.schema.dependentSchemas) {
-      this.schema.dependentSchemas = {};
-    }
-    Object.entries(deps).forEach(([props, schema]) => {
-      (this.schema.dependentSchemas as any)[props] =
-        typeof schema === "function"
-          ? schema(new SchemaBuilder()).build()
-          : schema instanceof SchemaBuilder
-            ? schema.build()
-            : schema;
-    });
-    return this;
+  option(key: string, value: any): SchemaBuilder<S> {
+    (this.schema as any)[key] = value;
+    return this as any;
   }
 
-  dependencies(
-    deps: Record<
-      string,
-      BuilderSchema | ((builder: SchemaBuilder) => SchemaBuilder) | string[]
-    >,
-  ): SchemaBuilder {
-    if (!this.schema.dependencies) this.schema.dependencies = {};
-    Object.entries(deps).forEach(([props, values]) => {
-      if (Array.isArray(values)) {
-        (this.schema.dependencies as any)[props] = values;
-      } else {
-        (this.schema.dependencies as any)[props] =
-          typeof values === "function"
-            ? values(new SchemaBuilder()).build()
-            : values instanceof SchemaBuilder
-              ? values.build()
-              : values;
-      }
-    });
-    return this;
+  extend<const B extends BuilderSchema>(v: B): SchemaBuilder<Simplify<S & B>> {
+    const schema = v instanceof SchemaBuilder ? v.build() : structuredClone(v);
+    this.schema = { ...this.schema, ...schema };
+    return this as any;
   }
 
-  propertyNames(
-    baseSchema: BuilderSchema | ((builder: SchemaBuilder) => SchemaBuilder),
-  ): SchemaBuilder {
-    const schema =
-      typeof baseSchema === "function"
-        ? baseSchema(new SchemaBuilder()).build()
-        : baseSchema instanceof SchemaBuilder
-          ? baseSchema.build()
-          : baseSchema;
-    this.schema.propertyNames = schema;
-    return this;
+  build(): ResolveBuildType<S> {
+    return structuredClone(this.schema);
   }
-
-  additionalProperties(
-    schema: BuilderSchema | ((builder: SchemaBuilder) => SchemaBuilder),
-  ): SchemaBuilder {
-    if (typeof schema === "boolean") {
-      this.schema.additionalProperties = schema;
-    } else {
-      this.schema.additionalProperties =
-        typeof schema === "function"
-          ? schema(new SchemaBuilder()).build()
-          : schema instanceof SchemaBuilder
-            ? schema.build()
-            : schema;
-    }
-    return this;
-  }
-
-  unevaluatedProperties(
-    schema: BuilderSchema | ((builder: SchemaBuilder) => SchemaBuilder),
-  ): SchemaBuilder {
-    if (typeof schema === "boolean") {
-      this.schema.unevaluatedProperties = schema;
-    } else {
-      this.schema.unevaluatedProperties =
-        typeof schema === "function"
-          ? schema(new SchemaBuilder()).build()
-          : schema instanceof SchemaBuilder
-            ? schema.build()
-            : schema;
-    }
-    return this;
-  }
-
-  minProperties(min: number | $data): SchemaBuilder {
-    this.schema.minProperties = min;
-    return this;
-  }
-
-  maxProperties(max: number | $data): SchemaBuilder {
-    this.schema.maxProperties = max;
-    return this;
-  }
-
-  dependentRequired(deps: Record<string, string[]>): SchemaBuilder {
-    if (!this.schema.dependentRequired) {
-      this.schema.dependentRequired = {};
-    }
-    Object.entries(deps).forEach(([props, fields]) => {
-      (this.schema.dependentRequired as any)[props] = fields;
-    });
-
-    return this;
-  }
-
   //#endregion
 }
