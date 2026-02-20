@@ -15,7 +15,9 @@
   "files": [
     "dist",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "CHANGELOG.md",
+    "TYPE_INFERENCE.md"
   ],
   "scripts": {
     "build": "npm run clean && tsc && npm run bundle",
