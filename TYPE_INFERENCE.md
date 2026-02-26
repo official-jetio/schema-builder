@@ -1910,7 +1910,7 @@ const strictUnion = new SchemaBuilder()
 // Type Inference:
 // { type: 'a', val: '' } ✅ matches first schema only
 // { type: 'b', vas: '' } ✅ matches second schema only
-// { type: 'b', val: '' } ❌ Must match only and exactly one 
+// { type: 'b', val: '' } ❌ Must match only and exactly one , type b expects vas not val
 
 // anyOf: AT LEAST one schema must match
 const flexibleUnion = new SchemaBuilder()
