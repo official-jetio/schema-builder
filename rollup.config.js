@@ -1,8 +1,6 @@
 import typescript from "rollup-plugin-typescript2";
 import filesize from "rollup-plugin-filesize";
 
-// No terser/minification - code stays readable
-
 export default [
   // ===========================================
   // ESM Build (modern bundlers, Node.js ESM)
@@ -23,7 +21,6 @@ export default [
         clean: true,
       }),
     ],
-    // IMPORTANT: Don't bundle the validator - it's a dependency
     external: ["@jetio/validator", "fs/promises"],
   },
 
@@ -50,7 +47,56 @@ export default [
         showBrotliSize: true,
       }),
     ],
-    // IMPORTANT: Don't bundle the validator - it's a dependency
     external: ["@jetio/validator", "fs/promises"],
+  },
+
+  {
+    input: "src/index.ts",
+    output: {
+      file: "dist/schema-builder.umd.js",
+      format: "umd",
+      name: "JetSchemaBuilder",
+      sourcemap: false,
+      exports: "named",
+      indent: true,
+      strict: true,
+    },
+    plugins: [
+      typescript({
+        tsconfig: "./tsconfig.rollup.json",
+        tsconfigOverride: {
+          compilerOptions: {
+            module: "ES2015",
+            target: "ES2018",
+          },
+        },
+      }),
+      {
+        name: "stub-fs",
+        resolveId(id) {
+          if (id === "fs/promises") return id;
+        },
+        load(id) {
+          if (id === "fs/promises") {
+            return `
+              export default {
+                access: () => Promise.reject(new Error('file() is not supported in browser environments')),
+                stat: () => Promise.reject(new Error('file() is not supported in browser environments')),
+                readFile: () => Promise.reject(new Error('file() is not supported in browser environments'))
+              }
+            `;
+          }
+        },
+      },
+      // filesize({
+      //   showGzippedSize: true,
+      //   showBrotliSize: true,
+      // }),
+      // visualizer({
+      //   filename: "bundle-analysis.html",
+      //   open: false,
+      // }),
+    ],
+    external: ["@jetio/validator"],
   },
 ];

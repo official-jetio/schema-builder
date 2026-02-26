@@ -99,7 +99,7 @@ const shapeSchema = new SchemaBuilder()
   )
   .build();
 
-type Shape = Jet.Infer;
+type Shape = Jet.Infer<shapeSchema>;
 // { type: 'circle'; radius: number } | { type: 'rectangle'; width: number; height: number }
 
 // Conditionals with elseIf
@@ -118,7 +118,7 @@ const accountSchema = new SchemaBuilder()
   .end()
   .build();
 
-type Account = Jet.Infer;
+type Account = Jet.Infer<accountSchema>;
 // TypeScript understands the conditional branches!
 ```
 
@@ -136,6 +136,99 @@ Topics covered in the Type Inference guide:
 -addtionalItems/Properties, unevaluatedProperties/Items, patternProperties.
 
 ---
+
+## 🚀 Try It Live
+
+[![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/edit/vitejs-vite-maszqpnk?file=src%2Fmain.ts)
+
+## Using with [@jetio/validator](https://www.npmjs.com/package/@jetio/validator)
+
+```typescript
+import { SchemaBuilder, Jet, JetValidator } from "@jetio/schema-builder";
+
+const accountSchema = new SchemaBuilder()
+  .object()
+  .properties({
+    accountType: (s) => s.string(),
+    username: (s) => s.string(),
+    companyName: (s) => s.string(),
+    email: (s) => s.string().format("email"),
+  })
+  .required(["accountType", "email"])
+  .if((s) =>
+    s.object().properties({
+      accountType: (s) => s.const("personal"),
+    })
+  )
+  .then((s) => s.object().required(["username"]))
+  .elseIf((s) =>
+    s.object().properties({
+      accountType: (s) => s.const("business"),
+    })
+  )
+  .then((s) => s.object().required(["companyName"]))
+  .end()
+  .build();
+
+// 1. See the generated JSON Schema
+console.log(JSON.stringify(accountSchema, null, 2));
+// {
+//   "type": "object",
+//   "properties": {
+//     "accountType": { "type": "string" },
+//     "username": { "type": "string" },
+//     "companyName": { "type": "string" },
+//     "email": { "type": "string", "format": "email" }
+//   },
+//   "required": ["accountType", "email"],
+//   "if": { "properties": { "accountType": { "const": "personal" } } },
+//   "then": { "required": ["username"] },
+//   "elseIf": [
+//     {
+//       "if": { "properties": { "accountType": { "const": "business" } } },
+//       "then": { "required": ["companyName"] }
+//     }
+//   ]
+// }
+
+// 2. Type inference
+type Account = Jet.Infer<typeof accountSchema>;
+// {
+//   accountType: "personal";
+//   email: string;
+//   username: string;
+//   companyName?: string;
+// } | {
+//   accountType: "business";
+//   email: string;
+//   companyName: string;
+//   username?: string;
+// } | {
+//   accountType: string;
+//   email: string;
+//   username?: string;
+//   companyName?: string;
+// }
+
+// 3. Runtime validation
+const validator = new JetValidator({ allErrors: true });
+const validate = validator.compile(accountSchema);
+
+console.log(validate({
+  accountType: "personal",
+  email: "alice@example.com",
+  username: "alice"
+})); // true
+
+console.log(validate({
+  accountType: "personal",
+  email: "alice@example.com"
+  // missing username!
+})); // false
+
+console.log(validate.errors);
+// [{ dataPath: '/', keyword: 'required', message: "must have required property 'username'" }]
+```
 
 ## 🎯 Quick Start
 

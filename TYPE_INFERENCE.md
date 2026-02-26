@@ -114,7 +114,7 @@ Get automatic Json Schema Compliant TypeScript types from your schemas with `Jet
 ## 📦 Quick Start
 
 ```typescript
-import { SchemaBuilder, Jet, JetValidator } from "@`@jetio/schema-builder`/schema-builder";
+import { SchemaBuilder, Jet, JetValidator } from "@jetio/schema-builder";
 
 const userSchema = new SchemaBuilder()
   .object()

@@ -41,7 +41,6 @@
   ],
   "author": "Great Venerable",
   "license": "MIT",
-  "type": "commonjs",
   "engines": {
     "node": ">=16.0.0"
   },
