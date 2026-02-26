@@ -56,6 +56,9 @@ export default [
       file: "dist/schema-builder.umd.js",
       format: "umd",
       name: "JetSchemaBuilder",
+      globals: {
+        "@jetio/validator": "JetValidator",
+      },
       sourcemap: false,
       exports: "named",
       indent: true,
@@ -74,17 +77,11 @@ export default [
       {
         name: "stub-fs",
         resolveId(id) {
-          if (id === "fs/promises") return id;
+          if (id === "fs/promises") return "\0fs-stub";
         },
         load(id) {
-          if (id === "fs/promises") {
-            return `
-              export default {
-                access: () => Promise.reject(new Error('file() is not supported in browser environments')),
-                stat: () => Promise.reject(new Error('file() is not supported in browser environments')),
-                readFile: () => Promise.reject(new Error('file() is not supported in browser environments'))
-              }
-            `;
+          if (id === "\0fs-stub") {
+            return `export const readFile = () => Promise.reject(new Error('file() is not supported in browsers'))`;
           }
         },
       },

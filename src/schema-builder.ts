@@ -4,7 +4,7 @@ import { ConditionBuilder } from "./condition-builder";
 import { StringSchemaBuilder } from "./types/string-schema";
 import { ObjectSchemaBuilder } from "./types/object-schema";
 import { NumberSchemaBuilder } from "./types/number-schema";
-import * as fs from "fs/promises";
+import { readFile } from 'fs/promises';
 import { BaseSchemaBuilder, BuilderSchema } from "./types/base-schema";
 import { BooleanSchema, NullSchema } from "./types/general";
 import { RefBuilder } from "./ref-builder";
@@ -716,7 +716,7 @@ export class SchemaBuilder<
   }
 
   async file(filePath: string): Promise<SchemaBuilder<any>> {
-    const fileContent = await fs.readFile(filePath, "utf-8");
+    const fileContent = await readFile(filePath, "utf-8");
     this.schema = JSON.parse(fileContent);
     return this as any;
   }
