@@ -3,6 +3,7 @@
     "target": "ES2020" /* Set the JavaScript language version for emitted JavaScript and include compatible library declarations. */,
     "module": "commonjs",
     "moduleResolution": "node",
+    "types": ["node"],
     "noErrorTruncation": true,
     "resolveJsonModule": true,
     "declaration": true,
