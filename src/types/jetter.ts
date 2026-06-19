@@ -1,6 +1,6 @@
 import { $data, SchemaDefinition } from "@jetio/validator";
 import { Prettify, Simplify } from "./helpers";
-
+// eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace Jet {
   export type Infer<T extends SchemaDefinition> = Jetter<T>;
 }
@@ -308,13 +308,14 @@ type JetImplementFInal<
             ],
             [MergeUnion<FinalUnion, MergeUnion<BaseResult, Jetter<Else>, true>>]
           >
-        :
-            | FinalUnion
-            | MergeUnion<
-                BaseResult,
-                MergeUnion<Jetter<IF>, Jetter<THEN>, true>,
-                true
-              >
+        : MergeUnion<
+            FinalUnion,
+            MergeUnion<
+              BaseResult,
+              MergeUnion<Jetter<IF>, Jetter<THEN>, true>,
+              true
+            >
+          >
     : T extends {
           elseIf: infer ElseIfArray extends ReadonlyArray<{
             if: SchemaDefinition;
@@ -449,10 +450,12 @@ type ElseIf<
       : never
     : never
 ) extends infer FinalResult
-  ? ExclusiveOr<
-      [FinalResult],
-      [MergeUnion<FinalUnion, MergeUnion<BaseResult, FallbackElse, true>>]
-    >
+  ? [FallbackElse] extends [never]
+    ? ExclusiveOr<[FinalResult], [FinalResult]>
+    : ExclusiveOr<
+        [ExclusiveOr<[FinalResult], [FinalResult]>],
+        [MergeUnion<FinalUnion, MergeUnion<BaseResult, FallbackElse, true>>]
+      >
   : never;
 
 type JetterType<Type, Schema extends SchemaDefinition> = Type extends "string"

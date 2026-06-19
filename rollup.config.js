@@ -1,5 +1,4 @@
-import typescript from "rollup-plugin-typescript2";
-import filesize from "rollup-plugin-filesize";
+import typescript from "@rollup/plugin-typescript";
 
 export default [
   // ===========================================
@@ -18,7 +17,6 @@ export default [
     plugins: [
       typescript({
         tsconfig: "./tsconfig.rollup.json",
-        clean: true,
       }),
     ],
     external: ["@jetio/validator", "fs/promises"],
@@ -40,12 +38,11 @@ export default [
     plugins: [
       typescript({
         tsconfig: "./tsconfig.rollup.json",
-        clean: true,
       }),
-      filesize({
-        showGzippedSize: true,
-        showBrotliSize: true,
-      }),
+      // filesize({
+      //   showGzippedSize: true,
+      //   showBrotliSize: true,
+      // }),
     ],
     external: ["@jetio/validator", "fs/promises"],
   },
@@ -67,11 +64,9 @@ export default [
     plugins: [
       typescript({
         tsconfig: "./tsconfig.rollup.json",
-        tsconfigOverride: {
-          compilerOptions: {
-            module: "ES2015",
-            target: "ES2018",
-          },
+        compilerOptions: {
+          module: "ES2015",
+          target: "ES2018",
         },
       }),
       {
