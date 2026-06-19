@@ -268,7 +268,7 @@ type Product = Jet.Infer<typeof productSchema>;
 - Type inference limitations and workarounds
 -addtionalItems/Properties, unevaluatedProperties/Items, patternProperties.
 
-##### @jetio/validator documentation at [docs](https://jet-validator-doc.vercel.app)
+##### @jetio/validator documentation at [docs](https://jet-validator-docs.vercel.app)
 
 ## 📄 License
 
