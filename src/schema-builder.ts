@@ -4,7 +4,7 @@ import { ConditionBuilder } from "./condition-builder";
 import { StringSchemaBuilder } from "./types/string-schema";
 import { ObjectSchemaBuilder } from "./types/object-schema";
 import { NumberSchemaBuilder } from "./types/number-schema";
-import { readFile } from 'fs/promises';
+import { readFile } from "fs/promises";
 import { BaseSchemaBuilder, BuilderSchema } from "./types/base-schema";
 import { BooleanSchema, NullSchema } from "./types/general";
 import { RefBuilder } from "./ref-builder";
@@ -110,7 +110,9 @@ export class SchemaBuilder<
       (this.schema as any).$defs[prop] =
         typeof schema === "function"
           ? schema(new SchemaBuilder()).build()
-          : schema instanceof SchemaBuilder
+          : typeof schema === "object" &&
+              schema !== null &&
+              schema instanceof SchemaBuilder
             ? schema.build()
             : schema;
     });
@@ -129,7 +131,9 @@ export class SchemaBuilder<
       (this.schema as any).definitions[prop] =
         typeof schema === "function"
           ? schema(new SchemaBuilder()).build()
-          : schema instanceof SchemaBuilder
+          : typeof schema === "object" &&
+              schema !== null &&
+              schema instanceof SchemaBuilder
             ? schema.build()
             : schema;
     });
@@ -142,7 +146,7 @@ export class SchemaBuilder<
     (this.schema as any).anyOf = schemas.map((s) =>
       typeof s === "function"
         ? s(new SchemaBuilder()).build()
-        : s instanceof SchemaBuilder
+        : typeof s === "object" && s !== null && s instanceof SchemaBuilder
           ? s.build()
           : s,
     );
@@ -155,7 +159,7 @@ export class SchemaBuilder<
     (this.schema as any).allOf = schemas.map((s) =>
       typeof s === "function"
         ? s(new SchemaBuilder()).build()
-        : s instanceof SchemaBuilder
+        : typeof s === "object" && s !== null && s instanceof SchemaBuilder
           ? s.build()
           : s,
     );
@@ -170,7 +174,7 @@ export class SchemaBuilder<
     (this.schema as any).oneOf = schemas.map((s) =>
       typeof s === "function"
         ? s(new SchemaBuilder()).build()
-        : s instanceof SchemaBuilder
+        : typeof s === "object" && s !== null && s instanceof SchemaBuilder
           ? s.build()
           : s,
     );
@@ -183,7 +187,9 @@ export class SchemaBuilder<
     (this.schema as any).not =
       typeof schema === "function"
         ? schema(new SchemaBuilder()).build()
-        : schema instanceof SchemaBuilder
+        : typeof schema === "object" &&
+            schema !== null &&
+            schema instanceof SchemaBuilder
           ? schema.build()
           : schema;
     return this as any;
@@ -199,7 +205,9 @@ export class SchemaBuilder<
     const resolved =
       typeof condition === "function"
         ? condition(new SchemaBuilder()).build()
-        : condition instanceof SchemaBuilder
+        : typeof condition === "object" &&
+            condition !== null &&
+            condition instanceof SchemaBuilder
           ? condition.build()
           : condition;
     return new ConditionBuilder(this, resolved) as any;
@@ -331,7 +339,7 @@ export class SchemaBuilder<
       (this.schema as any).properties[k] =
         typeof v === "function"
           ? v(new SchemaBuilder()).build()
-          : v instanceof SchemaBuilder
+          : typeof v === "object" && v !== null && v instanceof SchemaBuilder
             ? v.build()
             : v;
     });
@@ -386,7 +394,7 @@ export class SchemaBuilder<
       (this.schema as any).patternProperties[k] =
         typeof v === "function"
           ? v(new SchemaBuilder()).build()
-          : v instanceof SchemaBuilder
+          : typeof v === "object" && v !== null && v instanceof SchemaBuilder
             ? v.build()
             : v;
     });
@@ -407,7 +415,7 @@ export class SchemaBuilder<
     (this.schema as any).propertyNames =
       typeof v === "function"
         ? v(new SchemaBuilder()).build()
-        : v instanceof SchemaBuilder
+        : typeof v === "object" && v !== null && v instanceof SchemaBuilder
           ? v.build()
           : v;
     return this as any as SchemaBuilder<S>;
@@ -430,7 +438,7 @@ export class SchemaBuilder<
       (this.schema as any).dependentSchemas[k] =
         typeof v === "function"
           ? v(new SchemaBuilder()).build()
-          : v instanceof SchemaBuilder
+          : typeof v === "object" && v !== null && v instanceof SchemaBuilder
             ? v.build()
             : v;
     });
@@ -452,7 +460,7 @@ export class SchemaBuilder<
         (this.schema as any).dependencies[k] =
           typeof v === "function"
             ? v(new SchemaBuilder()).build()
-            : v instanceof SchemaBuilder
+            : typeof v === "object" && v !== null && v instanceof SchemaBuilder
               ? v.build()
               : v;
       }
@@ -466,7 +474,7 @@ export class SchemaBuilder<
     (this.schema as any).additionalProperties =
       typeof v === "function"
         ? v(new SchemaBuilder()).build()
-        : v instanceof SchemaBuilder
+        : typeof v === "object" && v !== null && v instanceof SchemaBuilder
           ? v.build()
           : v;
     return this as any as SchemaBuilder<
@@ -484,7 +492,7 @@ export class SchemaBuilder<
     (this.schema as any).unevaluatedProperties =
       typeof v === "function"
         ? v(new SchemaBuilder()).build()
-        : v instanceof SchemaBuilder
+        : typeof v === "object" && v !== null && v instanceof SchemaBuilder
           ? v.build()
           : v;
     return this as any as SchemaBuilder<
@@ -533,7 +541,9 @@ export class SchemaBuilder<
     (this.schema as any).contains =
       typeof val === "function"
         ? val(new SchemaBuilder()).build()
-        : val instanceof SchemaBuilder
+        : typeof val === "object" &&
+            val !== null &&
+            val instanceof SchemaBuilder
           ? val.build()
           : val;
     return this as any;
@@ -545,7 +555,7 @@ export class SchemaBuilder<
     (this.schema as any).prefixItems = v.map((x) =>
       typeof x === "function"
         ? x(new SchemaBuilder()).build()
-        : x instanceof SchemaBuilder
+        : typeof x === "object" && x !== null && x instanceof SchemaBuilder
           ? x.build()
           : x,
     );
@@ -574,14 +584,16 @@ export class SchemaBuilder<
       (this.schema as any).items =
         typeof single === "function"
           ? single(new SchemaBuilder()).build()
-          : single instanceof SchemaBuilder
+          : typeof single === "object" &&
+              single !== null &&
+              single instanceof SchemaBuilder
             ? single.build()
             : single;
     } else {
       (this.schema as any).items = val.map((s) =>
         typeof s === "function"
           ? s(new SchemaBuilder()).build()
-          : s instanceof SchemaBuilder
+          : typeof s === "object" && s !== null && s instanceof SchemaBuilder
             ? s.build()
             : s,
       );
@@ -595,7 +607,7 @@ export class SchemaBuilder<
     (this.schema as any).additionalItems =
       typeof v === "function"
         ? v(new SchemaBuilder()).build()
-        : v instanceof SchemaBuilder
+        : typeof v === "object" && v !== null && v instanceof SchemaBuilder
           ? v.build()
           : v;
     return this as any as SchemaBuilder<
@@ -609,7 +621,7 @@ export class SchemaBuilder<
     (this.schema as any).unevaluatedItems =
       typeof v === "function"
         ? v(new SchemaBuilder()).build()
-        : v instanceof SchemaBuilder
+        : typeof v === "object" && v !== null && v instanceof SchemaBuilder
           ? v.build()
           : v;
     return this as any as SchemaBuilder<
@@ -742,7 +754,10 @@ export class SchemaBuilder<
   }
 
   extend<const B extends BuilderSchema>(v: B): SchemaBuilder<Simplify<S & B>> {
-    const schema = v instanceof SchemaBuilder ? v.build() : structuredClone(v);
+    const schema =
+      typeof v === "object" && v !== null && v instanceof SchemaBuilder
+        ? v.build()
+        : structuredClone(v);
     this.schema = { ...this.schema, ...schema };
     return this as any;
   }
