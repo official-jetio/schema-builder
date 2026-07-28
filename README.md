@@ -76,6 +76,16 @@ One schema. A real type. A compiled validator. They can never fall out of sync.
 
 ---
 
+## Fast where it counts
+
+Inference is compile-time. But the validator you get competes directly with ajv in validation speed and compiles 14 to 19x faster on average.
+
+You don't trade speed for types or types for speed. You get both from the same `.build()`.
+
+>The best of both worlds.
+
+---
+
 ## What you can't do anywhere else
 
 ### `oneOf` is *actually* exclusive
