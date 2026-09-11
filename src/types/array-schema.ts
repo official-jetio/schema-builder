@@ -15,7 +15,7 @@ export interface ArraySchemaBuilder<
   uniqueItems(v: boolean | $data): ArraySchemaBuilder<S>;
 
   items<
-    const I extends (BuilderSchema | ((b: SchemaBuilder) => SchemaBuilder))[],
+    I extends (BuilderSchema | ((b: SchemaBuilder) => SchemaBuilder))[],
   >(
     ...val: I
   ): ArraySchemaBuilder<
@@ -39,7 +39,7 @@ export interface ArraySchemaBuilder<
   >;
 
   contains<
-    const I extends BuilderSchema | ((b: SchemaBuilder) => SchemaBuilder),
+    I extends BuilderSchema | ((b: SchemaBuilder) => SchemaBuilder),
   >(
     val: I,
   ): ArraySchemaBuilder<S>;
@@ -67,6 +67,6 @@ export interface ArraySchemaBuilder<
   object(): ObjectSchemaBuilder<AddType<S, "object">>;
   null(): NullSchema<AddType<S, "null">>;
   number(): NumberSchemaBuilder<AddType<S, "number">>;
-  integer(): NumberSchemaBuilder<AddType<S, "integer">>;
+  integer(): NumberSchemaBuilder<AddType<S, "number">>;
   boolean(): BooleanSchema<AddType<S, "boolean">>;
 }

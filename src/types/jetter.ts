@@ -2,7 +2,11 @@ import { $data, SchemaDefinition } from "@jetio/validator";
 import { Prettify, Simplify } from "./helpers";
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace Jet {
-  export type Infer<T extends SchemaDefinition> = Jetter<T>;
+  export type Infer<T extends SchemaDefinition | boolean> = T extends
+    | true
+    | false
+    ? Jetter<T, true>
+    : Jetter<T, false, true>;
 }
 
 type IsObjectSchema<T> = T extends
@@ -49,26 +53,49 @@ type ExtractNonObjects<T> = T extends any[] ? T : T extends object ? never : T;
 //         | ExtractNonObjects<Fixed>
 //         | MergeObjects<ExtractObjects<Union>, ExtractObjects<Fixed>>;
 
+
+
+type ExtractBoolRep<T extends boolean> = [T] extends [true] ? unknown : [T] extends [false] ? never : T;
 type MergeUnion<Union, Fixed, DeepMerge extends boolean = false> = [
   Union,
 ] extends [never]
   ? [Fixed] extends [never]
     ? never
-    : Fixed
+    : [Fixed] extends [boolean]
+      ? Fixed extends true
+        ? unknown
+        : Fixed extends false
+          ? never
+          : Fixed
+      : Fixed
   : [Fixed] extends [never]
-    ? Union
-    : DeepMerge extends true
-      ?
-          | ExtractNonObjects<Union>
-          | ExtractNonObjects<Fixed>
-          | IntrusiveDeepMergeObjects<
-              ExtractObjects<Union>,
-              ExtractObjects<Fixed>
-            >
-      :
-          | ExtractNonObjects<Union>
-          | ExtractNonObjects<Fixed>
-          | MergeObjects<ExtractObjects<Union>, ExtractObjects<Fixed>>;
+    ? [Union] extends [boolean]
+      ? Union extends true
+        ? unknown
+        : Union extends false
+          ? never
+          : Union
+      : Union
+    : [Union] extends [boolean]
+      ? [Fixed] extends [boolean]
+        ? ExtractBoolRep<Union> | ExtractBoolRep<Fixed>
+        : ExtractBoolRep<Union> | Fixed
+      : [Fixed] extends [boolean]
+        ? [Union] extends [boolean]
+          ? ExtractBoolRep<Union> | ExtractBoolRep<Fixed>
+          : ExtractBoolRep<Fixed> | Union
+        : DeepMerge extends true
+          ?
+              | ExtractNonObjects<Union>
+              | ExtractNonObjects<Fixed>
+              | IntrusiveDeepMergeObjects<
+                  ExtractObjects<Union>,
+                  ExtractObjects<Fixed>
+                >
+          :
+              | ExtractNonObjects<Union>
+              | ExtractNonObjects<Fixed>
+              | MergeObjects<ExtractObjects<Union>, ExtractObjects<Fixed>>;
 
 type RemoveIndex<T> = {
   [K in keyof T as string extends K
@@ -206,10 +233,17 @@ type MergeObjects<U, F> = U extends object
       : DeepMergeObjects<U, F>
     : U
   : U;
-export type Jetter<T extends SchemaDefinition> = T extends false
+
+export type Jetter<
+  T extends SchemaDefinition | boolean,
+  needTrue extends boolean = false,
+  fromAllOf extends boolean = false,
+> = T extends false
   ? never
   : T extends true
-    ? unknown
+    ? needTrue extends true
+      ? unknown
+      : never
     : T extends { const: infer C }
       ? C extends $data
         ? unknown
@@ -223,7 +257,8 @@ export type Jetter<T extends SchemaDefinition> = T extends false
             T extends { type: infer BT } ? BT : {},
             T extends { allOf: infer AllOfArray } ? AllOfArray : {},
             T extends { anyOf: infer AnOfArray } ? AnOfArray : {},
-            T extends { oneOf: infer OneOfArray } ? OneOfArray : {}
+            T extends { oneOf: infer OneOfArray } ? OneOfArray : {},
+            fromAllOf
           >;
 
 type ExclusiveOr<A extends ReadonlyArray<any>, B extends ReadonlyArray<any>> =
@@ -243,7 +278,7 @@ type MapExclusiveOr<
     : never;
 };
 
-type ExclusiveOrKeys<T extends ReadonlyArray<SchemaDefinition>> = {
+type ExclusiveOrKeys<T extends ReadonlyArray<SchemaDefinition | boolean>> = {
   [K in keyof T]: T[K] extends infer JT
     ? JT extends any[]
       ? never
@@ -254,32 +289,33 @@ type ExclusiveOrKeys<T extends ReadonlyArray<SchemaDefinition>> = {
 }[number];
 
 type JetImplementFInal<
-  T extends SchemaDefinition,
+  T extends SchemaDefinition | boolean,
   BaseResult,
   FinalUnion,
+  FromAllOf extends boolean = false,
 > = T extends {
-  if: infer IF extends SchemaDefinition;
+  if: infer IF extends SchemaDefinition | boolean;
 }
-  ? T extends { then: infer THEN extends SchemaDefinition }
+  ? T extends { then: infer THEN extends SchemaDefinition | boolean }
     ? T extends {
         elseIf: infer ElseIfArray extends ReadonlyArray<{
-          if: SchemaDefinition;
-          then?: SchemaDefinition;
+          if: SchemaDefinition | boolean;
+          then?: SchemaDefinition | boolean;
         }>;
       }
-      ? T extends { else: infer Else extends SchemaDefinition }
+      ? T extends { else: infer Else extends SchemaDefinition | boolean }
         ? ExclusiveOr<
             [
               MergeUnion<
                 FinalUnion,
                 MergeUnion<
                   BaseResult,
-                  MergeUnion<Jetter<IF>, Jetter<THEN>, true>,
+                  MergeUnion<Jetter<IF, false, true>, Jetter<THEN, false, true>, true>,
                   true
                 >
               >,
             ],
-            [ElseIf<ElseIfArray, Jetter<Else>, BaseResult, FinalUnion>]
+            [ElseIf<ElseIfArray, Jetter<Else, false, true>, BaseResult, FinalUnion>]
           >
         : ExclusiveOr<
             [
@@ -287,45 +323,54 @@ type JetImplementFInal<
                 FinalUnion,
                 MergeUnion<
                   BaseResult,
-                  MergeUnion<Jetter<IF>, Jetter<THEN>, true>,
+                  MergeUnion<Jetter<IF, false, true>, Jetter<THEN, false, true>, true>,
                   true
                 >
               >,
             ],
-            [ElseIf<ElseIfArray, never, BaseResult, FinalUnion>]
+            [ElseIf<ElseIfArray, {}, BaseResult, FinalUnion>]
           >
-      : T extends { else: infer Else extends SchemaDefinition }
+      : T extends { else: infer Else extends SchemaDefinition | boolean }
         ? ExclusiveOr<
             [
               MergeUnion<
                 FinalUnion,
                 MergeUnion<
                   BaseResult,
-                  MergeUnion<Jetter<IF>, Jetter<THEN>, true>,
+                  MergeUnion<Jetter<IF, false, true>, Jetter<THEN, false, true>, true>,
                   true
                 >
               >,
             ],
-            [MergeUnion<FinalUnion, MergeUnion<BaseResult, Jetter<Else>, true>>]
+            [MergeUnion<FinalUnion, MergeUnion<BaseResult, Jetter<Else, false, true>, true>>]
           >
-        : MergeUnion<
-            FinalUnion,
-            MergeUnion<
-              BaseResult,
-              MergeUnion<Jetter<IF>, Jetter<THEN>, true>,
-              true
+        : FromAllOf extends true
+          ? MergeUnion<
+              FinalUnion,
+              MergeUnion<
+                BaseResult,
+                DeepOptional<MergeUnion<Jetter<IF, false, true>, Jetter<THEN, false, true>, true>>,
+                true
+              >
             >
-          >
+          : MergeUnion<
+              FinalUnion,
+              MergeUnion<
+                BaseResult,
+                MergeUnion<Jetter<IF, false, true>, Jetter<THEN, false, true>, true>,
+                true
+              >
+            >
     : T extends {
           elseIf: infer ElseIfArray extends ReadonlyArray<{
-            if: SchemaDefinition;
-            then?: SchemaDefinition;
+            if: SchemaDefinition | boolean;
+            then?: SchemaDefinition | boolean;
           }>;
         }
-      ? T extends { else: infer Else extends SchemaDefinition }
+      ? T extends { else: infer Else extends SchemaDefinition | boolean }
         ? ExclusiveOr<
-            [MergeUnion<FinalUnion, MergeUnion<BaseResult, Jetter<IF>, true>>],
-            [ElseIf<ElseIfArray, Jetter<Else>, BaseResult, FinalUnion>]
+            [MergeUnion<FinalUnion, MergeUnion<BaseResult, Jetter<IF, false, true>, true>>],
+            [ElseIf<ElseIfArray, Jetter<Else, false, true>, BaseResult, FinalUnion>]
           >
         :
             | FinalUnion
@@ -333,15 +378,15 @@ type JetImplementFInal<
                 [
                   MergeUnion<
                     FinalUnion,
-                    MergeUnion<BaseResult, Jetter<IF>, true>
+                    MergeUnion<BaseResult, Jetter<IF, false, true>, true>
                   >,
                 ],
-                [ElseIf<ElseIfArray, never, BaseResult, FinalUnion>]
+                [ElseIf<ElseIfArray, {}, BaseResult, FinalUnion>]
               >
-      : T extends { else: infer Else extends SchemaDefinition }
+      : T extends { else: infer Else extends SchemaDefinition | boolean }
         ? ExclusiveOr<
-            [MergeUnion<FinalUnion, MergeUnion<BaseResult, Jetter<IF>, true>>],
-            [MergeUnion<FinalUnion, MergeUnion<BaseResult, Jetter<Else>, true>>]
+            [MergeUnion<FinalUnion, MergeUnion<BaseResult, Jetter<IF, false, true>, true>>],
+            [MergeUnion<FinalUnion, MergeUnion<BaseResult, Jetter<Else, false, true>, true>>]
           >
         : [FinalUnion] extends [never]
           ? BaseResult
@@ -350,25 +395,83 @@ type JetImplementFInal<
     ? BaseResult
     : FinalUnion;
 
-type JetImplement<T extends SchemaDefinition, BT, TALL, TANY, TONE> =
+type DeepOptional<T> = T extends any
+  ? T extends readonly any[]
+    ? T
+    : T extends object
+      ? { [K in keyof T]?: DeepOptional<T[K]> }
+      : T
+  : never;
+// type JetImplement<T extends SchemaDefinition | boolean, BT, TALL, TANY, TONE> =
+//   MergeUnion<
+//     ResType<T, BT>,
+//     TALL extends ReadonlyArray<infer Schemas>
+//       ? UnionToIntersection<Jetter<Extract<Schemas, SchemaDefinition | boolean>>>
+//       : never,
+//     true
+//   > extends infer BaseResult
+//     ? MergeUnion<
+//         TANY extends ReadonlyArray<SchemaDefinition | boolean>
+//           ? Jetter<TANY[number]> extends infer A
+//             ? A extends any
+//               ? [BaseResult] extends [never]
+//                 ? A
+//                 : MergeUnion<BaseResult, A, true>
+//               : never
+//             : never
+//           : never,
+//         TONE extends ReadonlyArray<SchemaDefinition | boolean>
+//           ? OneOf<TONE, BaseResult> extends infer O
+//             ? O extends any
+//               ? O
+//               : never
+//             : never
+//           : never
+//       > extends infer FinalUnion
+//       ? JetImplementFInal<T, BaseResult, FinalUnion>
+//       : JetImplementFInal<T, BaseResult, never>
+//     : never;
+
+type JetImplement<
+  T extends SchemaDefinition | boolean,
+  BT,
+  TALL,
+  TANY,
+  TONE,
+  FromAllOf extends boolean = false,
+> =
   MergeUnion<
     ResType<T, BT>,
     TALL extends ReadonlyArray<infer Schemas>
-      ? UnionToIntersection<Jetter<Extract<Schemas, SchemaDefinition>>>
+      ? MergeUnion<
+          UnionToIntersection<
+            Jetter<Extract<Schemas, SchemaDefinition | boolean>, false, true>
+          >,
+          {},
+          true
+        >
       : never,
     true
   > extends infer BaseResult
     ? MergeUnion<
-        TANY extends ReadonlyArray<SchemaDefinition>
-          ? Jetter<TANY[number]> extends infer A
-            ? A extends any
-              ? [BaseResult] extends [never]
-                ? A
-                : MergeUnion<BaseResult, A, true>
+        TANY extends ReadonlyArray<SchemaDefinition | boolean>
+          ? TANY[number] extends infer TA extends boolean | SchemaDefinition
+            ? Jetter<TA> extends infer A
+              ? A extends any
+                ? [BaseResult] extends [never]
+                  ? TA extends true
+                    ? { [x: string]: any }
+                    : A
+                  : TA extends true
+                    ? BaseResult extends object
+                      ? Prettify<BaseResult & { [x: string]: any }>
+                      : MergeUnion<BaseResult, never, true>
+                    : MergeUnion<BaseResult, A, true>
+                : never
               : never
             : never
           : never,
-        TONE extends ReadonlyArray<SchemaDefinition>
+        TONE extends ReadonlyArray<SchemaDefinition | boolean>
           ? OneOf<TONE, BaseResult> extends infer O
             ? O extends any
               ? O
@@ -376,11 +479,11 @@ type JetImplement<T extends SchemaDefinition, BT, TALL, TANY, TONE> =
             : never
           : never
       > extends infer FinalUnion
-      ? JetImplementFInal<T, BaseResult, FinalUnion>
-      : JetImplementFInal<T, BaseResult, never>
+      ? JetImplementFInal<T, BaseResult, FinalUnion, FromAllOf>
+      : JetImplementFInal<T, BaseResult, never, FromAllOf>
     : never;
 
-type ResType<T extends SchemaDefinition, BT> =
+type ResType<T extends SchemaDefinition | boolean, BT> =
   BT extends ReadonlyArray<infer AT>
     ? JetterType<AT, T>
     : T extends { type: infer Type }
@@ -395,22 +498,27 @@ type ResType<T extends SchemaDefinition, BT> =
             ? unknown
             : never;
 
-type OneOf<Arr extends ReadonlyArray<SchemaDefinition>, BaseResult> = MapOneOf<
-  Arr,
-  BaseResult
->[number];
+type OneOf<
+  Arr extends ReadonlyArray<SchemaDefinition | boolean>,
+  BaseResult,
+> = MapOneOf<Arr, BaseResult>[number];
 
-type MapOneOf<T extends ReadonlyArray<SchemaDefinition>, BaseResult> = {
+type MapOneOf<
+  T extends ReadonlyArray<SchemaDefinition | boolean>,
+  BaseResult,
+> = {
   [K in keyof T]: MergeUnion<BaseResult, Jetter<T[K]>> extends infer OT
     ? OT extends any[]
       ? OT
       : OT extends object
-        ? Simplify<Strict<OT, AllKeys<T>>>
+        ? T[K] extends true
+          ? Prettify<{ [OK in keyof OT]: OT[OK] } & { [b: string]: any }>
+          : Simplify<Strict<OT, AllKeys<T>>>
         : OT
     : never;
 };
 
-type AllKeys<T extends ReadonlyArray<SchemaDefinition>> = {
+type AllKeys<T extends ReadonlyArray<SchemaDefinition | boolean>> = {
   [K in keyof T]: Jetter<T[K]> extends infer JT
     ? JT extends any[]
       ? never
@@ -426,23 +534,23 @@ type Strict<T, K extends PropertyKey> = T & {
 
 type ElseIf<
   ElseIfArray extends ReadonlyArray<{
-    if: SchemaDefinition;
+    if: SchemaDefinition | boolean;
   }>,
   FallbackElse,
   BaseResult,
   FinalUnion,
 > = (
-  ElseIfArray extends ReadonlyArray<{ if: SchemaDefinition }>
+  ElseIfArray extends ReadonlyArray<{ if: SchemaDefinition | boolean }>
     ? ElseIfArray[number] extends infer A
       ? A extends {
-          if: infer IF extends SchemaDefinition;
-          then: infer THEN extends SchemaDefinition;
+          if: infer IF extends SchemaDefinition | boolean;
+          then: infer THEN extends SchemaDefinition | boolean;
         }
         ? MergeUnion<
             FinalUnion,
             MergeUnion<
               BaseResult,
-              MergeUnion<Jetter<IF>, Jetter<THEN>, true>,
+              MergeUnion<Jetter<IF, false, true>, Jetter<THEN, false, true>, true>,
               true
             >
           >
@@ -458,7 +566,10 @@ type ElseIf<
       >
   : never;
 
-type JetterType<Type, Schema extends SchemaDefinition> = Type extends "string"
+type JetterType<
+  Type,
+  Schema extends SchemaDefinition | boolean,
+> = Type extends "string"
   ? string
   : Type extends "number"
     ? number
@@ -474,42 +585,42 @@ type JetterType<Type, Schema extends SchemaDefinition> = Type extends "string"
               ? JetterObject<Schema>
               : never;
 
-type JetterArray<Schema extends SchemaDefinition> = Schema extends {
+type JetterArray<Schema extends SchemaDefinition | boolean> = Schema extends {
   prefixItems: infer P extends ReadonlyArray<any>;
 }
   ? [
-      ...{ [Index in keyof P]: Jetter<Extract<P[Index], SchemaDefinition>> },
+      ...{
+        [Index in keyof P]: Jetter<
+          Extract<P[Index], SchemaDefinition | boolean>,
+          true,
+          true
+        >;
+      },
       ...(Schema extends { items: infer I }
-        ? I extends false
-          ? never[]
-          : Jetter<Extract<I, SchemaDefinition>>[]
+        ? Jetter<Extract<I, SchemaDefinition | boolean>, true, true>[]
         : Schema extends { unevaluatedItems: infer UI }
-          ? UI extends false
-            ? never[]
-            : Jetter<Extract<UI, SchemaDefinition>>[]
+          ? Jetter<Extract<UI, SchemaDefinition | boolean>, true, true>[]
           : any[]),
     ]
   : Schema extends { items: infer I extends ReadonlyArray<any> }
     ? [
         ...{
-          [Index in keyof I]: Jetter<Extract<I[Index], SchemaDefinition>>;
+          [Index in keyof I]: Jetter<
+            Extract<I[Index], SchemaDefinition | boolean>,
+            true,
+            true
+          >;
         },
         ...(Schema extends {
           additionalItems: infer AI;
         }
-          ? AI extends false
-            ? never[]
-            : Jetter<Extract<AI, SchemaDefinition>>[]
+          ? Jetter<Extract<AI, SchemaDefinition | boolean>, true, true>[]
           : any[]),
       ]
     : Schema extends { items: infer I }
-      ? I extends false
-        ? never[]
-        : Jetter<Extract<I, SchemaDefinition>>[]
+      ? Jetter<Extract<I, SchemaDefinition | boolean>, true, true>[]
       : Schema extends { additionalItems: infer I }
-        ? I extends false
-          ? never[]
-          : Jetter<Extract<I, SchemaDefinition>>[]
+        ? Jetter<Extract<I, SchemaDefinition | boolean>, true, true>[]
         : any[];
 
 type PatternToTemplate<P extends string> = P extends `^${infer Prefix}_`
@@ -545,13 +656,15 @@ type PatternToTemplate<P extends string> = P extends `^${infer Prefix}_`
 type JetterPatternProperties<PP> =
   PP extends Record<string, any>
     ? {
-        [K in keyof PP as PatternToTemplate<
-          K & string
-        >]: PP[K] extends SchemaDefinition ? Jetter<PP[K]> : any;
+        [K in keyof PP as PatternToTemplate<K & string>]: PP[K] extends
+          | SchemaDefinition
+          | boolean
+          ? Jetter<PP[K], true, true>
+          : any;
       }
     : {};
 
-type JetterObject<Schema extends SchemaDefinition> = Schema extends {
+type JetterObject<Schema extends SchemaDefinition | boolean> = Schema extends {
   readonly properties: infer Props;
 }
   ? Prettify<
@@ -585,15 +698,17 @@ type JetterObject<Schema extends SchemaDefinition> = Schema extends {
       : Schema extends { additionalProperties: false }
         ? Record<string, never>
         : Schema extends {
-              additionalProperties: infer AP extends SchemaDefinition;
+              additionalProperties: infer AP extends SchemaDefinition | boolean;
             }
-          ? Record<string, Jetter<AP>>
+          ? Record<string, Jetter<AP, true, true>>
           : Schema extends { unevaluatedProperties: false }
             ? Record<string, never>
             : Schema extends {
-                  unevaluatedProperties: infer AP extends SchemaDefinition;
+                  unevaluatedProperties: infer AP extends
+                    | SchemaDefinition
+                    | boolean;
                 }
-              ? { [key: string]: Jetter<AP> }
+              ? { [key: string]: Jetter<AP, true, true> }
               : Record<string, any>;
 
 export type GetElseIf<Arr, V> = {
@@ -603,26 +718,30 @@ export type GetElseIf<Arr, V> = {
       ? { if: Arr[K]["if"]; then: V }
       : Arr[K];
 };
-type JetterProperties<Props, Schema extends SchemaDefinition> =
+type JetterProperties<Props, Schema extends SchemaDefinition | boolean> =
   Props extends Record<string, any>
     ? MergeRequiredOptional<Props, Schema>
     : Record<string, any>;
 
-type MergeRequiredOptional<Props, Schema extends SchemaDefinition> = {
+type MergeRequiredOptional<Props, Schema extends SchemaDefinition | boolean> = {
   [K in keyof Props as K extends RequiredKeys<Schema>
     ? K
-    : never]: Props[K] extends SchemaDefinition ? Jetter<Props[K]> : any;
+    : never]: Props[K] extends SchemaDefinition | boolean
+    ? Jetter<Props[K], true, true>
+    : any;
 } & {
   [K in keyof Props as K extends RequiredKeys<Schema>
     ? never
-    : K]?: Props[K] extends SchemaDefinition ? Jetter<Props[K]> : any;
+    : K]?: Props[K] extends SchemaDefinition | boolean
+    ? Jetter<Props[K], true, true>
+    : any;
 } & {
   [K in Exclude<RequiredKeys<Schema>, keyof Props> as K extends string
     ? K
     : never]: any;
 };
 
-type RequiredKeys<Schema extends SchemaDefinition> = Schema extends {
+type RequiredKeys<Schema extends SchemaDefinition | boolean> = Schema extends {
   required: ReadonlyArray<infer Keys>;
 }
   ? Keys

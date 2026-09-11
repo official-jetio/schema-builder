@@ -14,8 +14,6 @@
     "skipLibCheck": true,
     "sourceMap": true /* Skip type checking all .d.ts files. */
   },
-  "include": [
-    "src/**/*.ts", "test/stayhere.ts",
-  ],
+  "include": ["src/**/*.ts", "test/stayhere.ts", "test/jetter copy.ts"],
   "exclude": ["test/**/*.ts", "node_modules", "test/stayhere.ts"]
 }

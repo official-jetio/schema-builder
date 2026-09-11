@@ -265,7 +265,6 @@ export class SchemaBuilder<
   //#endregion
 
   //#region Number region
-
   number(): NumberSchemaBuilder<AddType<S, "number">> {
     this.addType("number");
     return this as any;
@@ -319,7 +318,7 @@ export class SchemaBuilder<
   }
 
   properties<
-    const P extends Record<
+    P extends Record<
       string,
       BuilderSchema | ((b: SchemaBuilder) => SchemaBuilder)
     >,
@@ -383,7 +382,7 @@ export class SchemaBuilder<
   }
 
   patternProperties<
-    const P extends Record<
+    P extends Record<
       string,
       BuilderSchema | ((b: SchemaBuilder) => SchemaBuilder)
     >,
@@ -410,7 +409,7 @@ export class SchemaBuilder<
   }
 
   propertyNames<
-    const P extends BuilderSchema | ((b: SchemaBuilder) => SchemaBuilder),
+    P extends BuilderSchema | ((b: SchemaBuilder) => SchemaBuilder),
   >(v: P) {
     (this.schema as any).propertyNames =
       typeof v === "function"
@@ -421,13 +420,13 @@ export class SchemaBuilder<
     return this as any as SchemaBuilder<S>;
   }
 
-  dependentRequired<const P extends Record<string, string[]>>(d: P) {
+  dependentRequired<P extends Record<string, string[]>>(d: P) {
     (this.schema as any).dependentRequired = d;
     return this as any as SchemaBuilder<S>;
   }
 
   dependentSchemas<
-    const P extends Record<
+    P extends Record<
       string,
       BuilderSchema | ((builder: SchemaBuilder) => SchemaBuilder)
     >,
@@ -446,7 +445,7 @@ export class SchemaBuilder<
   }
 
   dependencies<
-    const P extends Record<
+    P extends Record<
       string,
       BuilderSchema | ((builder: SchemaBuilder) => SchemaBuilder) | string[]
     >,
@@ -469,7 +468,7 @@ export class SchemaBuilder<
   }
 
   additionalProperties<
-    const P extends BuilderSchema | ((b: SchemaBuilder) => SchemaBuilder),
+    P extends BuilderSchema | ((b: SchemaBuilder) => SchemaBuilder),
   >(v: P) {
     (this.schema as any).additionalProperties =
       typeof v === "function"
@@ -487,7 +486,7 @@ export class SchemaBuilder<
   }
 
   unevaluatedProperties<
-    const P extends BuilderSchema | ((b: SchemaBuilder) => SchemaBuilder),
+    P extends BuilderSchema | ((b: SchemaBuilder) => SchemaBuilder),
   >(v: P) {
     (this.schema as any).unevaluatedProperties =
       typeof v === "function"

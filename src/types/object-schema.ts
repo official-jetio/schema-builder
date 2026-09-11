@@ -11,7 +11,7 @@ export interface ObjectSchemaBuilder<
   S extends object,
 > extends BaseSchemaBuilder<S> {
   properties<
-    const P extends Record<
+    P extends Record<
       string,
       BuilderSchema | ((b: SchemaBuilder) => SchemaBuilder)
     >,
@@ -21,9 +21,7 @@ export interface ObjectSchemaBuilder<
     Simplify<
       Omit<S, "properties"> & {
         properties: S extends { properties: infer Existing }
-          ? Simplify<
-              Existing & P
-            >
+          ? Simplify<Existing & P>
           : P;
       }
     >
@@ -50,7 +48,7 @@ export interface ObjectSchemaBuilder<
   maxProperties(max: number | $data): SchemaBuilder<S>;
 
   patternProperties<
-    const P extends Record<
+    P extends Record<
       string,
       BuilderSchema | ((b: SchemaBuilder) => SchemaBuilder)
     >,
@@ -60,52 +58,42 @@ export interface ObjectSchemaBuilder<
     Simplify<
       Omit<S, "patternProperties"> & {
         patternProperties: S extends { patternProperties: infer Existing }
-          ? Simplify<
-              Existing & P
-            >
+          ? Simplify<Existing & P>
           : P;
       }
     >
   >;
 
   propertyNames<
-    const P extends BuilderSchema | ((b: SchemaBuilder) => SchemaBuilder),
+    P extends BuilderSchema | ((b: SchemaBuilder) => SchemaBuilder),
   >(
     v: P,
-  ): SchemaBuilder<
-    S
-  >;
+  ): SchemaBuilder<S>;
 
-  dependentRequired<const P extends Record<string, string[]>>(
+  dependentRequired<P extends Record<string, string[]>>(
     d: P,
-  ): SchemaBuilder<
-   S
-  >;
+  ): SchemaBuilder<S>;
 
   dependentSchemas<
-    const P extends Record<
+    P extends Record<
       string,
       BuilderSchema | ((builder: SchemaBuilder) => SchemaBuilder)
     >,
   >(
     d: P,
-  ): SchemaBuilder<
-     S
-  >;
+  ): SchemaBuilder<S>;
 
   dependencies<
-    const P extends Record<
+    P extends Record<
       string,
       BuilderSchema | ((builder: SchemaBuilder) => SchemaBuilder) | string[]
     >,
   >(
     d: P,
-  ): SchemaBuilder<
-    S
-  >;
+  ): SchemaBuilder<S>;
 
   additionalProperties<
-    const P extends BuilderSchema | ((b: SchemaBuilder) => SchemaBuilder),
+    P extends BuilderSchema | ((b: SchemaBuilder) => SchemaBuilder),
   >(
     v: P,
   ): SchemaBuilder<
@@ -117,7 +105,7 @@ export interface ObjectSchemaBuilder<
   >;
 
   unevaluatedProperties<
-    const P extends BuilderSchema | ((b: SchemaBuilder) => SchemaBuilder),
+    P extends BuilderSchema | ((b: SchemaBuilder) => SchemaBuilder),
   >(
     v: P,
   ): SchemaBuilder<
@@ -181,6 +169,6 @@ export interface ObjectSchemaBuilder<
   array(): ArraySchemaBuilder<AddType<S, "array">>;
   null(): NullSchema<AddType<S, "null">>;
   number(): NumberSchemaBuilder<AddType<S, "number">>;
-  integer(): NumberSchemaBuilder<AddType<S, "integer">>;
+  integer(): NumberSchemaBuilder<AddType<S, "number">>;
   boolean(): BooleanSchema<AddType<S, "boolean">>;
 }
