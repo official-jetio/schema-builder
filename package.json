@@ -46,7 +46,7 @@
   },
   "sideEffects": false,
   "dependencies": {
-    "@jetio/validator": "^2.0.0"
+    "@jetio/validator": "^3.0.0"
   },
   "devDependencies": {
     "@rollup/plugin-terser": "^1.0.0",
