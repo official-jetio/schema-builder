@@ -19,7 +19,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "npm run clean && tsc && npm run bundle",
+    "build": "npm run clean && npm run bundle",
     "bundle": "rollup -c",
     "clean": "rm -rf dist/",
     "lint": "eslint src --ext .ts",
