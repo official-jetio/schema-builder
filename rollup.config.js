@@ -1,4 +1,6 @@
 import typescript from "@rollup/plugin-typescript";
+import resolve from "@rollup/plugin-node-resolve";
+import commonjs from "@rollup/plugin-commonjs";
 
 export default [
   // ===========================================
@@ -53,15 +55,14 @@ export default [
       file: "dist/schema-builder.umd.js",
       format: "umd",
       name: "JetSchemaBuilder",
-      globals: {
-        "@jetio/validator": "JetValidator",
-      },
       sourcemap: false,
       exports: "named",
       indent: true,
       strict: true,
     },
     plugins: [
+      resolve(),
+      commonjs(),
       typescript({
         tsconfig: "./tsconfig.rollup.json",
         compilerOptions: {
@@ -89,6 +90,5 @@ export default [
       //   open: false,
       // }),
     ],
-    external: ["@jetio/validator"],
   },
 ];

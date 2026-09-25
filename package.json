@@ -1,6 +1,6 @@
 {
   "name": "@jetio/schema-builder",
-  "version": "3.0.2",
+  "version": "3.0.1",
   "description": "Fluent, type-safe JSON Schema builder with spec compliant type inference for TypeScript. Works with @jetio/validator.",
   "main": "dist/index.cjs.js",
   "module": "dist/index.esm.js",
@@ -49,6 +49,8 @@
     "@jetio/validator": "^3.0.0"
   },
   "devDependencies": {
+    "@rollup/plugin-commonjs": "^29.0.3",
+    "@rollup/plugin-node-resolve": "^16.0.3",
     "@rollup/plugin-terser": "^1.0.0",
     "@rollup/plugin-typescript": "^12.3.0",
     "@types/node": "^18.19.130",
